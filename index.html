@@ -3,29 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <title>Money Machine</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src='//libtl.com/sdk.js' data-zone='10388714' data-sdk='show_10388714'></script>
 
 
 
-<!-- Add script to your app -->
-
-<html>
-    <head>
-        ...
-        <script src='//libtl.com/sdk.js' data-zone='10388714' data-sdk='show_10388714'></script>
-    </head>
-    ...
-</html>
-
-
-
-
-
- 
+    
 <style>
 body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden}
-#ui{position:fixed;top:5px;left:5px;z-index:10}
-button{padding:6px;margin:2px;font-size:13px}
-canvas{background:#111;display:block;margin:auto}
+header{
+ position:fixed;top:0;width:100%;height:50px;
+ background:#111;display:flex;align-items:center;
+ justify-content:space-around;z-index:10
+}
+button{padding:6px 10px;font-size:13px}
+canvas{display:block;margin:auto;background:#111;margin-top:50px}
 .menu{
  position:fixed;top:50%;left:50%;
  transform:translate(-50%,-50%);
@@ -34,72 +28,58 @@ canvas{background:#111;display:block;margin:auto}
  max-height:80vh;overflow:auto
 }
 .skin{
- display:inline-block;width:40px;height:40px;
- margin:5px;border:2px solid #555;
- cursor:pointer
+ width:40px;height:40px;margin:4px;
+ display:inline-block;border:2px solid #555
 }
 .locked{opacity:.3}
-@keyframes pulse{
- 0%{transform:scale(1)}
- 50%{transform:scale(1.1)}
- 100%{transform:scale(1)}
-}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
 </style>
 </head>
 
 <body>
 
-
-
-
-
-
-
-
-
-
-
-    
-<div id="ui">
- <div id="hud"></div>
+<header>
+ <span id="hud"></span>
  <button onclick="shoot()">🔥</button>
  <button onclick="openShop()">🛒</button>
  <button onclick="openSettings()">⚙️</button>
- <button onclick="dailyReward()">🎁</button><br>
- <button onclick="move(-1)">⬅</button>
- <button onclick="move(1)">➡</button>
-</div>
+ <button onclick="dailyReward()">🎁</button>
+</header>
 
 <canvas id="game" width="360" height="600"></canvas>
 
+<!-- SHOP -->
 <div id="shop" class="menu">
  <h3>🛒 Shop</h3>
  <button onclick="watchAd('speed')">⚡ Speed (1 Ad)</button>
  <hr>
- <h3>🎨 Player Skins (2 Ads)</h3>
+ <h3>🎨 Skins (2 Ads)</h3>
  <div id="skins"></div>
  <p id="adStatus"></p>
+ <button onclick="claimReward()">✅ Claim Reward</button><br><br>
  <button onclick="closeShop()">Close</button>
 </div>
 
+<!-- SETTINGS -->
 <div id="settings" class="menu">
  <h3>⚙️ Settings</h3>
  Sensitivity
- <input type="range" min="1" max="10" value="5"
- oninput="sensitivity=this.value"><br><br>
+ <input type="range" min="1" max="10" value="5" oninput="sensitivity=this.value">
+ <br><br>
  <button onclick="closeSettings()">Close</button>
 </div>
 
+<!-- GAME OVER -->
 <div id="gameover" class="menu">
- <h2>💀 GAME OVER</h2>
+ <h2>GAME OVER</h2>
  <div id="leaderboard"></div><br>
- <button onclick="restart()">🔄 Restart</button>
+ <button onclick="restart()">Restart</button>
 </div>
 
 <script>
-const c=document.getElementById("game");
-const ctx=c.getContext("2d");
+Telegram.WebApp.expand();
 
+/* ---------- DATA ---------- */
 const colors=[
 "cyan","red","lime","yellow","orange","pink","purple","gold",
 "#00f","#0ff","#f0f","#ff0","#f80","#8f0","#0f8","#80f",
@@ -109,42 +89,42 @@ const colors=[
 "#bbb","#faa","#afa","#aaf","#fe0","#0ef"
 ];
 
-let saveData=JSON.parse(localStorage.getItem("mmSave"))||{
+let save=JSON.parse(localStorage.getItem("mmSave"))||{
  coins:0,level:1,speed:6,skin:0,unlocked:[0]
 };
 
-let player={x:160,y:520,w:30,h:30};
+let coins=save.coins,level=save.level,speed=save.speed;
+let skin=save.skin,unlocked=save.unlocked;
+let sensitivity=5;
 let bullets=[],enemies=[];
-let coins=saveData.coins,level=saveData.level;
-let speed=saveData.speed,sensitivity=5;
-let skin=saveData.skin;
-let unlocked=saveData.unlocked;
-let game=true,boss=false;
-let adCount={speed:0,skin:0};
+let player={x:160,y:520,w:30,h:30};
+let boss=false,game=true;
+let pendingReward=null,skinAds=0;
 
-function save(){
+const c=document.getElementById("game");
+const ctx=c.getContext("2d");
+
+/* ---------- SAVE ---------- */
+function saveData(){
  localStorage.setItem("mmSave",JSON.stringify({
   coins,level,speed,skin,unlocked
  }));
 }
 
+/* ---------- HUD ---------- */
 function hud(){
- hudEl.innerText=`💰${coins} 🔥 Lv ${level}`;
- save();
+ document.getElementById("hud").innerText=
+ `💰${coins} | Lv ${level}`;
+ saveData();
 }
-
-const hudEl=document.getElementById("hud");
 hud();
 
+/* ---------- GAME ---------- */
 function shoot(){bullets.push({x:player.x+12,y:player.y})}
-function move(d){
- player.x+=d*speed*(sensitivity/5);
- player.x=Math.max(0,Math.min(330,player.x));
-}
 
 document.onkeydown=e=>{
- if(e.key=="ArrowLeft"||e.key=="a")move(-1);
- if(e.key=="ArrowRight"||e.key=="d")move(1);
+ if(e.key=="ArrowLeft")player.x-=speed*(sensitivity/5);
+ if(e.key=="ArrowRight")player.x+=speed*(sensitivity/5);
  if(e.key==" ")shoot();
 };
 
@@ -161,14 +141,12 @@ function spawnBoss(){
  enemies.push({x:80,y:-120,s:100,hp:120,sp:1,b:true});
 }
 
-function update(){
+function loop(){
  if(!game)return;
  ctx.clearRect(0,0,360,600);
 
  ctx.fillStyle=colors[skin];
  ctx.fillRect(player.x,player.y,30,30);
- ctx.strokeStyle="#fff";
- ctx.strokeRect(player.x,player.y,30,30);
 
  bullets.forEach((b,i)=>{
   b.y-=12;
@@ -199,38 +177,83 @@ function update(){
   ) endGame();
  });
 
- if(!boss && Math.random()<0.025)spawnEnemy();
- if(level==10 && !boss){boss=true;spawnBoss();}
+ if(!boss && Math.random()<0.03)spawnEnemy();
+ if(level==10&&!boss){boss=true;spawnBoss();}
  if(coins>level*70&&!boss)level++;
 
  hud();
- requestAnimationFrame(update);
+ requestAnimationFrame(loop);
 }
-update();
+loop();
 
+/* ---------- GAME OVER ---------- */
 function endGame(){
  game=false;
- saveScore();
- gameover.style.display="block";
-}
-
-function restart(){location.reload();}
-
-function saveScore(){
  let lb=JSON.parse(localStorage.getItem("mmLB"))||[];
  lb.push(coins);
  lb.sort((a,b)=>b-a);
  lb=lb.slice(0,5);
  localStorage.setItem("mmLB",JSON.stringify(lb));
  leaderboard.innerHTML="🏆<br>"+lb.join("<br>");
+ gameover.style.display="block";
 }
+function restart(){location.reload();}
 
+/* ---------- MENUS ---------- */
 function openShop(){shop.style.display="block";renderSkins();}
 function closeShop(){shop.style.display="none";}
 function openSettings(){settings.style.display="block";}
 function closeSettings(){settings.style.display="none";}
 function dailyReward(){coins+=20;hud();}
- 
+
+/* ---------- MONETAG ADS ---------- */
+function watchAd(type,index=null){
+ pendingReward={type,index};
+ window.open("https://YOUR_MONETAG_LINK_HERE","_blank");
+ alert("Watch ad then return and press CLAIM");
+}
+
+function claimReward(){
+ if(!pendingReward){alert("No reward");return;}
+
+ if(pendingReward.type=="speed")speed+=2;
+
+ if(pendingReward.type=="skin"){
+  skinAds++;
+  if(skinAds>=2){
+   unlocked.push(pendingReward.index);
+   skin=pendingReward.index;
+   skinAds=0;
+  }
+ }
+
+ pendingReward=null;
+ renderSkins();
+ hud();
+ alert("Reward granted!");
+}
+
+/* ---------- SKINS ---------- */
+function renderSkins(){
+ skins.innerHTML="";
+ colors.forEach((c,i)=>{
+  let d=document.createElement("div");
+  d.className="skin"+(unlocked.includes(i)?"":" locked");
+  d.style.background=c;
+  d.style.animation="pulse 1s infinite";
+  d.onclick=()=>{
+   if(unlocked.includes(i))skin=i;
+   else watchAd("skin",i);
+  };
+  skins.appendChild(d);
+ });
+}
+</script>
+
+
+<script>
+const MONETAG_LINK = "
+
 // Rewarded Popup
 
 show_10388714('pop').then(() => {
@@ -241,32 +264,51 @@ show_10388714('pop').then(() => {
     // do nothing or whatever you want
 })
 
+        ";
 
+/* store pending reward */
+function watchAd(rewardType, skinId = null) {
+  localStorage.setItem(
+    "pendingReward",
+    JSON.stringify({ rewardType, skinId })
+  );
 
+  // open monetag ONLY after user click
+  window.open(MONETAG_LINK, "_blank");
 
-// In-App Interstitial
+  alert("📺 Watch the ad, then come back and press CLAIM");
+}
 
-show_10388714({
-  type: 'inApp',
-  inAppSettings: {
-    frequency: 2,
-    capping: 0.1,
-    interval: 30,
-    timeout: 5,
-    everyPage: false
+/* claim reward safely */
+function claimReward() {
+  const data = JSON.parse(localStorage.getItem("pendingReward"));
+  if (!data) {
+    alert("❌ No reward pending");
+    return;
   }
-})
 
-/*
-This value is decoded as follows:
-- show automatically 2 ads
-  within 0.1 hours (6 minutes)
-  with a 30-second interval between them
-  and a 5-second delay before the first one is shown.
-  The last digit, 0, means that the session will be saved when you navigate between pages.
-  If you set the last digit as 1, then at any transition between pages,
-  the session will be reset, and the ads will start again.
-*/
+  if (data.rewardType === "speed") {
+    playerSpeed += 2;
+  }
+
+  if (data.rewardType === "skin") {
+    skinAdCount++;
+    if (skinAdCount >= 2) {
+      unlockedSkins.push(data.skinId);
+      currentSkin = data.skinId;
+      skinAdCount = 0;
+    }
+  }
+
+  if (data.rewardType === "daily") {
+    coins += 200;
+  }
+
+  localStorage.removeItem("pendingReward");
+  updateUI();
+  alert("✅ Reward unlocked!");
+}
+</script>
 
 
 
@@ -279,50 +321,5 @@ This value is decoded as follows:
 
 
     
-
-function watchAd(type,index){
- adStatus.innerText="Watching ad...";
- setTimeout(()=>{
-  if(type=="speed"){speed+=2}
-  if(type=="skin"){
-   adCount.skin++;
-   if(adCount.skin>=2){
-    unlocked.push(index);
-    skin=index;
-    adCount.skin=0;
-   }
-      
-// Rewarded interstitial
-
-show_10388714().then(() => {
-    // You need to add your user reward function here, which will be executed after the user watches the ad.
-    // For more details, please refer to the detailed instructions.
-    alert('You have seen an ad!');
-})
-
-        
-  }
-  adStatus.innerText="✅ Done";
-  renderSkins();
-  hud();
- },5000);
-}
-
-function renderSkins(){
- skins.innerHTML="";
- colors.forEach((c,i)=>{
-  let d=document.createElement("div");
-  d.className="skin"+(unlocked.includes(i)?"":" locked");
-  d.style.background=c;
-  d.style.animation="pulse 1s infinite";
-  d.onclick=()=>{
-   if(unlocked.includes(i)){skin=i}
-   else watchAd("skin",i);
-  };
-  skins.appendChild(d);
- });
-}
-</script>
-
 </body>
 </html>
