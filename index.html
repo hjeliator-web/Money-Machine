@@ -71,7 +71,17 @@ background:#222;padding:15px;border:2px solid #555;display:none}
  <a href="contact.html">Contact</a>
 </div>
 
+
+
+
+
+
+
+
+
+ 
 <script>
+ let adInProgress = false;
 Telegram.WebApp.expand();
 
 /* ---------- DATA ---------- */
@@ -159,20 +169,28 @@ function openShop(){shop.style.display="block";renderSkins();}
 function closeShop(){shop.style.display="none";}
 
 /* ---------- MONETAG ---------- */
-function watchRewardAd(type,skinIndex=null){
- show_10388714('pop').then(()=>{
-  ads++;giveReward(type,skinIndex);
- });
+function watchRewardAd(type, skinIndex = null) {
+
+  // ❌ prevent auto / double / resume calls
+  if (adInProgress) return;
+
+  adInProgress = true;
+
+  show_10388714('pop')
+    .then(() => {
+      giveReward(type, skinIndex);
+    })
+    .catch(err => {
+      console.log("Ad error:", err);
+    })
+    .finally(() => {
+      // unlock AFTER ad completely closes
+      setTimeout(() => {
+        adInProgress = false;
+      }, 1000);
+    });
 }
-function giveReward(type,skinIndex){
- if(type==="speed")speed+=2;
- if(type==="daily")coins+=100;
- if(type==="revive"){game=true;gameover.style.display="none";loop();}
- if(type==="skin"){
-  skinAds++;if(skinAds>=2){unlocked.push(skinIndex);skin=skinIndex;skinAds=0;}
- }
- hud();renderSkins();
-}
+
 
 /* ---------- SKINS ---------- */
 function renderSkins(){
