@@ -175,6 +175,11 @@ function loop(){
  requestAnimationFrame(loop);
 }
 loop();
+
+ let tg = Telegram.WebApp;
+let user = tg.initDataUnsafe.user;
+let username = user?.first_name || "Player";
+
 </script>
 
 </body>
