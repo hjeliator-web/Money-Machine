@@ -26,237 +26,191 @@ button{
  margin:4px;
 }
 #hud{padding:6px;font-weight:bold;}
+
 #joystick{
- width:120px;
- height:120px;
+ width:120px;height:120px;
  background:rgba(255,255,255,0.15);
  border-radius:50%;
- position:fixed;
- bottom:20px;
- left:20px;
+ position:fixed;bottom:20px;left:20px;
  touch-action:none;
 }
 #stick{
- width:50px;
- height:50px;
- background:#00e5ff;
- border-radius:50%;
- position:absolute;
- top:35px;
- left:35px;
+ width:50px;height:50px;
+ background:#00e5ff;border-radius:50%;
+ position:absolute;top:35px;left:35px;
+}
+
+/* SETTINGS MENU */
+#settings{
+ position:fixed;
+ inset:0;
+ background:rgba(0,0,0,0.85);
+ display:none;
+ align-items:center;
+ justify-content:center;
+ z-index:99;
+}
+#settingsBox{
+ background:#081b4b;
+ padding:20px;
+ border-radius:12px;
+ width:280px;
 }
 </style>
 </head>
 
 <body>
 
-<div id="hud">Loading...</div>
+<div id="hud"></div>
 
 <canvas id="game" width="360" height="520"></canvas>
 
 <button onclick="shoot()">🔫 FIRE</button>
-<button onclick="restart()">🔄 Restart</button>
+<button onclick="openSettings()">⚙️ Settings</button>
 
-<div style="margin-top:8px;">
- 🎚️ Sensitivity
- <input type="range" min="0.1" max="0.6" step="0.05"
-        id="sensSlider">
- <span id="sensValue"></span>
-</div>
+<div id="joystick"><div id="stick"></div></div>
 
-<div id="joystick">
- <div id="stick"></div>
+<!-- SETTINGS MENU -->
+<div id="settings">
+ <div id="settingsBox">
+  <h3>⚙️ SETTINGS</h3>
+
+  🎚 Sensitivity<br>
+  <input type="range" min="0.1" max="0.6" step="0.05"
+         id="sensSlider"><br>
+  <span id="sensValue"></span><br><br>
+
+  🔊 Sound:
+  <button onclick="toggleSound()">Toggle</button><br><br>
+
+  💾 Reset Progress<br>
+  <button onclick="resetProgress()">Reset</button><br><br>
+
+  <button onclick="closeSettings()">▶ Resume</button>
+ </div>
 </div>
 
 <script>
-// ================= TELEGRAM =================
+// TELEGRAM
 Telegram.WebApp.expand();
 
-// ================= GAME STATE =================
+// GAME STATE
 let coins = Number(localStorage.coins || 0);
 let lives = 3;
 let gameOver = false;
+let paused = false;
 
-// ================= SENSITIVITY =================
+// SETTINGS
 let sensitivity = Number(localStorage.sensitivity || 0.3);
+let soundOn = localStorage.sound !== "off";
 
-// ================= AI DIFFICULTY =================
-let difficulty = 1;
-let killCount = 0;
-let startTime = Date.now();
-
-// ================= CANVAS =================
+// CANVAS
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-// ================= PLAYER =================
+// PLAYER
 let player = { x:160, y:460 };
 
-// ================= OBJECTS =================
-let bullets = [];
-let enemies = [];
-let fallingCoins = [];
+// OBJECTS
+let bullets=[], enemies=[], fallingCoins=[];
 
-// ================= HUD =================
+// HUD
 function updateHUD(){
- document.getElementById("hud").innerText =
- `🪙 ${coins} | ❤️ ${lives} | 🤖 AI ${difficulty}`;
+ document.getElementById("hud").innerText=
+ `🪙 ${coins} | ❤️ ${lives}`;
 }
 updateHUD();
 
-// ================= SHOOT =================
+// SHOOT
 function shoot(){
- if(gameOver) return;
+ if(gameOver||paused) return;
  bullets.push({x:player.x+12,y:player.y});
 }
 
-// ================= DIFFICULTY =================
-setInterval(()=>{
- let timePlayed=(Date.now()-startTime)/1000;
- difficulty=Math.min(10,1+Math.floor(timePlayed/30)+Math.floor(killCount/10));
-},2000);
+// SPAWN
+setInterval(()=>{if(!paused&&!gameOver)enemies.push({x:Math.random()*320,y:-30,s:2});},1000);
+setInterval(()=>{if(!paused&&!gameOver)fallingCoins.push({x:Math.random()*320,y:-20});},1200);
 
-// ================= SPAWN =================
-function spawnEnemy(){
- let r=Math.random();
- let e={
-  x:Math.random()*320,
-  y:-40,
-  speed:2+difficulty*0.3,
-  hp:1,
-  icon:"🚁",
-  dir:1,
-  type:"normal"
- };
- if(r>0.8){e.icon="✈️";e.speed+=2;}
- else if(r>0.6){e.icon="🛸";e.hp=3;}
- else if(r>0.4){e.icon="🐝";e.type="zigzag";}
- enemies.push(e);
-}
-function spawnCoin(){
- fallingCoins.push({x:Math.random()*320,y:-20});
-}
-
-// ================= GAME LOOP =================
+// GAME LOOP
 function loop(){
- ctx.clearRect(0,0,360,520);
+ if(paused||gameOver) return;
 
- // PLAYER
+ ctx.clearRect(0,0,360,520);
  ctx.font="32px Arial";
  ctx.fillText("🛡️",player.x,player.y);
 
- // BULLETS
- for(let i=bullets.length-1;i>=0;i--){
-  bullets[i].y-=8;
-  ctx.font="18px Arial";
-  ctx.fillText("🔥",bullets[i].x,bullets[i].y);
-  if(bullets[i].y<0) bullets.splice(i,1);
- }
+ bullets.forEach(b=>{b.y-=8;ctx.font="18px Arial";ctx.fillText("🔥",b.x,b.y);});
+ bullets=bullets.filter(b=>b.y>0);
 
- // ENEMIES
- for(let i=enemies.length-1;i>=0;i--){
-  let e=enemies[i];
-  e.y+=e.speed;
-  if(e.type==="zigzag"){
-   e.x+=2*e.dir;
-   if(e.x<0||e.x>330) e.dir*=-1;
-  }
-  ctx.font="26px Arial";
-  ctx.fillText(e.icon,e.x,e.y);
+ enemies.forEach(e=>{e.y+=e.s;ctx.font="26px Arial";ctx.fillText("✈️",e.x,e.y);});
+ enemies=enemies.filter(e=>{
+  if(e.y>460){lives--;updateHUD();return false;}
+  return true;
+ });
 
-  if(e.y>440){
-   enemies.splice(i,1);
-   lives--;
-   if(lives<=0){endGame();return;}
-   continue;
-  }
+ fallingCoins.forEach(c=>{c.y+=2;ctx.font="20px Arial";ctx.fillText("🪙",c.x,c.y);});
+ fallingCoins=fallingCoins.filter(c=>{
+  if(c.y>460){coins++;updateHUD();return false;}
+  return true;
+ });
 
-  for(let b=bullets.length-1;b>=0;b--){
-   let bl=bullets[b];
-   if(Math.abs(bl.x-e.x)<25&&Math.abs(bl.y-e.y)<25){
-    bullets.splice(b,1);
-    e.hp--;
-    if(e.hp<=0){
-     enemies.splice(i,1);
-     coins+=5;
-     killCount++;
-     updateHUD();
-    }
-    break;
-   }
-  }
- }
-
- // COINS
- for(let i=fallingCoins.length-1;i>=0;i--){
-  fallingCoins[i].y+=2;
-  ctx.font="20px Arial";
-  ctx.fillText("🪙",fallingCoins[i].x,fallingCoins[i].y);
-  if(fallingCoins[i].y>450){
-   coins++;
-   fallingCoins.splice(i,1);
-   updateHUD();
-  }
- }
-
- if(!gameOver) requestAnimationFrame(loop);
+ requestAnimationFrame(loop);
 }
+loop();
 
-// ================= GAME OVER =================
-function endGame(){
- gameOver=true;
- alert("💀 GAME OVER");
- localStorage.coins=coins;
-}
-
-// ================= RESTART =================
-function restart(){
- lives=3;
- enemies=[];
- bullets=[];
- fallingCoins=[];
- gameOver=false;
- updateHUD();
- loop();
-}
-
-// ================= INTERVALS =================
-setInterval(()=>{if(!gameOver)spawnEnemy();},1000);
-setInterval(()=>{if(!gameOver)spawnCoin();},900);
-
-// ================= JOYSTICK =================
+// JOYSTICK
 const joy=document.getElementById("joystick");
 const stick=document.getElementById("stick");
-let dragging=false;
+let drag=false;
 
-joy.addEventListener("touchstart",()=>dragging=true);
+joy.addEventListener("touchstart",()=>drag=true);
 joy.addEventListener("touchmove",e=>{
- if(!dragging) return;
- let rect=joy.getBoundingClientRect();
- let dx=e.touches[0].clientX-rect.left-60;
+ if(!drag||paused) return;
+ let r=joy.getBoundingClientRect();
+ let dx=e.touches[0].clientX-r.left-60;
  player.x+=dx*sensitivity;
  if(player.x<0)player.x=0;
  if(player.x>330)player.x=330;
  stick.style.left=(35+dx*0.3)+"px";
 });
 joy.addEventListener("touchend",()=>{
- dragging=false;
+ drag=false;
  stick.style.left="35px";
 });
 
-// ================= SENSITIVITY UI =================
-const slider=document.getElementById("sensSlider");
-const val=document.getElementById("sensValue");
-slider.value=sensitivity;
-val.innerText=sensitivity;
-slider.oninput=()=>{
- sensitivity=Number(slider.value);
- localStorage.sensitivity=sensitivity;
- val.innerText=sensitivity;
-};
+// SETTINGS MENU FUNCTIONS
+function openSettings(){
+ paused=true;
+ document.getElementById("settings").style.display="flex";
+}
+function closeSettings(){
+ paused=false;
+ document.getElementById("settings").style.display="none";
+ loop();
+}
+function toggleSound(){
+ soundOn=!soundOn;
+ localStorage.sound=soundOn?"on":"off";
+ alert("Sound "+(soundOn?"ON":"OFF"));
+}
+function resetProgress(){
+ if(confirm("Reset all data?")){
+  coins=0;
+  localStorage.clear();
+  alert("Reset Done");
+ }
+}
 
-// START
-loop();
+// SENSITIVITY UI
+const s=document.getElementById("sensSlider");
+const v=document.getElementById("sensValue");
+s.value=sensitivity;
+v.innerText=sensitivity;
+s.oninput=()=>{
+ sensitivity=Number(s.value);
+ localStorage.sensitivity=sensitivity;
+ v.innerText=sensitivity;
+};
 </script>
 
 </body>
