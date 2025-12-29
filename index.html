@@ -203,13 +203,18 @@ function openSettings(){settings.style.display="block";}
 function closeSettings(){settings.style.display="none";}
 
 /* ---------- MONETAG REWARDED POPUP ---------- */
-function watchRewardAd(type, skinIndex=null){
- show_10388714('pop').then(()=>{
-  giveReward(type, skinIndex);
- }).catch(e=>{
-  console.log("Ad error", e);
- });
+
+ function watchRewardAd(rewardType, skinIndex = null) {
+
+  show_10388714('pop').then(() => {
+    // user watched or closed ad
+    giveReward(rewardType, skinIndex);
+  }).catch(e => {
+    console.log("Ad error:", e);
+  });
+
 }
+
 
 function giveReward(type, skinIndex){
  if(type==="speed"){
