@@ -3,6 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <title>Money Machine</title>
+
+
+
+<!-- Add script to your app -->
+
+<html>
+    <head>
+        ...
+        <script src='//libtl.com/sdk.js' data-zone='10388714' data-sdk='show_10388714'></script>
+    </head>
+    ...
+</html>
+
+
+
+
+
+ 
 <style>
 body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden}
 #ui{position:fixed;top:5px;left:5px;z-index:10}
@@ -201,6 +219,18 @@ function closeShop(){shop.style.display="none";}
 function openSettings(){settings.style.display="block";}
 function closeSettings(){settings.style.display="none";}
 function dailyReward(){coins+=20;hud();}
+ 
+// Rewarded Popup
+
+show_10388714('pop').then(() => {
+    // user watch ad till the end or close it in interstitial format
+    // your code to reward user for rewarded format
+}).catch(e => {
+    // user get error during playing ad
+    // do nothing or whatever you want
+})
+
+        
 
 function watchAd(type,index){
  adStatus.innerText="Watching ad...";
