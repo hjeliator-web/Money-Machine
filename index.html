@@ -81,8 +81,22 @@ background:#222;padding:15px;border:2px solid #555;display:none}
 
  
 <script>
- let adInProgress = false;
-Telegram.WebApp.expand();
+ let userInteracted = false;
+let adInProgress = false;
+
+// unlock ads only after real user action
+function unlockAdsOnce() {
+  userInteracted = true;
+  document.removeEventListener("click", unlockAdsOnce);
+  document.removeEventListener("keydown", unlockAdsOnce);
+  document.removeEventListener("touchstart", unlockAdsOnce);
+}
+
+// listen for first interaction
+document.addEventListener("click", unlockAdsOnce);
+document.addEventListener("keydown", unlockAdsOnce);
+document.addEventListener("touchstart", unlockAdsOnce);
+
 
 /* ---------- DATA ---------- */
 const colors=["cyan","red","lime","yellow","orange","pink","purple","gold"];
@@ -171,7 +185,13 @@ function closeShop(){shop.style.display="none";}
 /* ---------- MONETAG ---------- */
 function watchRewardAd(type, skinIndex = null) {
 
-  // ❌ prevent auto / double / resume calls
+  // ❌ BLOCK ads on app start
+  if (!userInteracted) {
+    alert("Please interact with the game first 🙂");
+    return;
+  }
+
+  // ❌ prevent double / resume calls
   if (adInProgress) return;
 
   adInProgress = true;
@@ -184,10 +204,9 @@ function watchRewardAd(type, skinIndex = null) {
       console.log("Ad error:", err);
     })
     .finally(() => {
-      // unlock AFTER ad completely closes
       setTimeout(() => {
         adInProgress = false;
-      }, 1000);
+      }, 1500);
     });
 }
 
