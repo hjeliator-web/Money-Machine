@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <title>Money Machine</title>
+
+<!-- Telegram Web App -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
@@ -20,14 +22,14 @@ canvas{
  margin:auto;
 }
 #hud{
- font-size:16px;
+ font-size:15px;
  font-weight:bold;
  padding:6px;
 }
 button{
- padding:8px 14px;
+ padding:8px 12px;
  margin:3px;
- font-size:15px;
+ font-size:14px;
  border-radius:8px;
 }
 </style>
@@ -35,103 +37,122 @@ button{
 
 <body>
 
-<div id="hud">🪙 0 | ⭐ 1 | 🔫 Lv1</div>
+<div id="hud">Loading...</div>
 <canvas id="game" width="360" height="480"></canvas>
 
 <div>
 <button onclick="shoot()">🔫 Shoot</button>
-<button onclick="shop()">🛒 Shop</button>
-<button onclick="missions()">🎯 Missions</button>
-<button onclick="leaderboard()">🏆 Rank</button>
+<button onclick="showMissions()">🎯 Missions</button>
+<button onclick="showLeaderboard()">🏆 Rank</button>
 </div>
 
 <script>
+// ================= TELEGRAM USER =================
 Telegram.WebApp.expand();
+let tg = Telegram.WebApp;
+let user = tg.initDataUnsafe.user || {};
+let username = user.first_name || "Player";
+let userid = user.id || Math.floor(Math.random()*99999);
 
-const c=document.getElementById("game");
-const x=c.getContext("2d");
+// ================= GAME DATA =================
+let coins = Number(localStorage.coins || 0);
+let level = Number(localStorage.level || 1);
+let kills = Number(localStorage.kills || 0);
 
-let coins=Number(localStorage.coins||0);
-let level=Number(localStorage.level||1);
-let gun=Number(localStorage.gun||1);
-let kills=Number(localStorage.kills||0);
-let skin=localStorage.skin||"🧑‍🚀";
+// ENERGY
+let energy = Number(localStorage.energy ?? 10);
+
+// DAILY REWARD
+let today = new Date().toDateString();
+if(localStorage.lastReward !== today){
+ coins += 50;
+ alert("🎁 Daily Reward: +50 coins");
+ localStorage.lastReward = today;
+}
+
+// MISSIONS
+let mission = JSON.parse(localStorage.mission || "{}");
+if(mission.date !== today){
+ mission = {date:today, kills:0, done:false};
+}
+
+// LEADERBOARD
+let board = JSON.parse(localStorage.board || "[]");
+
+// ================= CANVAS =================
+const c = document.getElementById("game");
+const x = c.getContext("2d");
 
 let bullets=[];
-let clouds=[{x:0,y:40},{x:150,y:70},{x:300,y:50}];
+let plane={x:-80,y:80,alive:true};
 
-let plane={x:-80,y:80,alive:true,boss:false};
-
-let bots=[
- {name:"Ali",coins:200},
- {name:"Ahmed",coins:150},
- {name:"John",coins:180},
- {name:"Max",coins:220}
-];
-
+// ================= FUNCTIONS =================
 function save(){
  localStorage.coins=coins;
  localStorage.level=level;
- localStorage.gun=gun;
  localStorage.kills=kills;
- localStorage.skin=skin;
+ localStorage.energy=energy;
+ localStorage.mission=JSON.stringify(mission);
+ localStorage.board=JSON.stringify(board);
 }
 
 function hud(){
- document.getElementById("hud").innerText=
- `🪙 ${coins} | ⭐ ${level} | 🔫 Lv${gun}`;
+ document.getElementById("hud").innerText =
+ `👤 ${username} | 🪙 ${coins} | ⚡ ${energy} | ⭐ ${level}`;
 }
 
 function shoot(){
+ if(energy<=0){
+  alert("⚡ No energy, wait!");
+  return;
+ }
+ energy--;
  bullets.push({x:180,y:420});
+ save(); hud();
 }
 
-function shop(){
- if(coins>=100){
-  coins-=100; gun++;
-  alert("Gun upgraded!");
-  save(); hud();
- }else alert("Need 100 coins");
+function showMissions(){
+ let txt = "🎯 DAILY MISSION\n";
+ txt += "Shoot 5 planes\n";
+ txt += `Progress: ${mission.kills}/5\n`;
+ txt += mission.done ? "✅ Completed" : "❌ Not done";
+ alert(txt);
 }
 
-function missions(){
- alert(
- "🎯 MISSIONS\n"+
- "1️⃣ Shoot 5 planes = +50 coins\n"+
- "2️⃣ Defeat boss = +100 coins\n"+
- "3️⃣ Reach level 5"
- );
-}
-
-function leaderboard(){
- let all=[{name:"YOU",coins:coins},...bots];
- all.sort((a,b)=>b.coins-a.coins);
- let text="🏆 LEADERBOARD\n";
- all.slice(0,5).forEach((p,i)=>{
-  text+=`${i+1}. ${p.name} - ${p.coins}\n`;
+function showLeaderboard(){
+ updateBoard();
+ let txt="🏆 LEADERBOARD\n";
+ board.forEach((p,i)=>{
+  txt += `${i+1}. ${p.name} - ${p.coins}\n`;
  });
- alert(text);
+ alert(txt);
 }
 
+function updateBoard(){
+ board = board.filter(p=>p.id!==userid);
+ board.push({id:userid,name:username,coins:coins});
+ board.sort((a,b)=>b.coins-a.coins);
+ board = board.slice(0,10);
+}
+
+// ENERGY REGEN
+setInterval(()=>{
+ if(energy<10){
+  energy++;
+  save(); hud();
+ }
+},60000);
+
+// ================= GAME LOOP =================
 function spawnPlane(){
- plane.alive=true;
  plane.x=-80;
- plane.y=60+Math.random()*100;
- plane.boss = level%5===0;
+ plane.y=60+Math.random()*120;
+ plane.alive=true;
 }
-
-spawnPlane(); hud();
+spawnPlane();
 
 function loop(){
  x.clearRect(0,0,360,480);
-
- // clouds
- x.font="28px Arial";
- clouds.forEach(cl=>{
-  cl.x+=0.3;
-  if(cl.x>380) cl.x=-50;
-  x.fillText("☁️",cl.x,cl.y);
- });
 
  // ground
  x.fillStyle="#4caf50";
@@ -139,34 +160,44 @@ function loop(){
 
  // player
  x.font="30px Arial";
- x.fillText(skin,165,420);
+ x.fillText("🧑‍🚀",165,420);
 
  // plane
  if(plane.alive){
-  plane.x+=2+level/2;
-  x.font=plane.boss?"40px Arial":"30px Arial";
-  x.fillText(plane.boss?"🛩️":"✈️",plane.x,plane.y);
+  plane.x+=2+level*0.3;
+  x.font="30px Arial";
+  x.fillText("✈️",plane.x,plane.y);
   if(plane.x>380) spawnPlane();
  }
 
  // bullets
  for(let i=bullets.length-1;i>=0;i--){
-  bullets[i].y-=6+gun;
+  bullets[i].y-=7;
   x.font="20px Arial";
   x.fillText("🔥",bullets[i].x,bullets[i].y);
 
   if(plane.alive &&
-     bullets[i].y<plane.y+30 &&
+     bullets[i].y<plane.y+20 &&
      bullets[i].x>plane.x &&
      bullets[i].x<plane.x+40){
 
     plane.alive=false;
+    bullets.splice(i,1);
+
+    coins+=10;
     kills++;
-    coins+=plane.boss?80:15;
+    mission.kills++;
+
+    if(mission.kills>=5 && !mission.done){
+     coins+=100;
+     mission.done=true;
+     alert("🎯 Mission complete! +100 coins");
+    }
+
     if(kills%5===0) level++;
+
     save(); hud();
     setTimeout(spawnPlane,800);
-    bullets.splice(i,1);
   }
 
   if(bullets[i] && bullets[i].y<0) bullets.splice(i,1);
@@ -174,12 +205,9 @@ function loop(){
 
  requestAnimationFrame(loop);
 }
+
+hud();
 loop();
-
- let tg = Telegram.WebApp;
-let user = tg.initDataUnsafe.user;
-let username = user?.first_name || "Player";
-
 </script>
 
 </body>
