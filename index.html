@@ -3,8 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>Money Machine</title>
-
-<!-- Telegram Web App -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
@@ -26,6 +24,11 @@ canvas{
  font-weight:bold;
  padding:6px;
 }
+#daily{
+ font-size:14px;
+ color:#333;
+ margin-bottom:5px;
+}
 button{
  padding:8px 12px;
  margin:3px;
@@ -38,16 +41,18 @@ button{
 <body>
 
 <div id="hud">Loading...</div>
+<div id="daily">Checking daily reward...</div>
+
 <canvas id="game" width="360" height="480"></canvas>
 
 <div>
 <button onclick="shoot()">🔫 Shoot</button>
-<button onclick="showMissions()">🎯 Missions</button>
+<button onclick="claimDaily()">🎁 Daily</button>
 <button onclick="showLeaderboard()">🏆 Rank</button>
 </div>
 
 <script>
-// ================= TELEGRAM USER =================
+// ================= TELEGRAM =================
 Telegram.WebApp.expand();
 let tg = Telegram.WebApp;
 let user = tg.initDataUnsafe.user || {};
@@ -57,66 +62,58 @@ let userid = user.id || Math.floor(Math.random()*99999);
 // ================= GAME DATA =================
 let coins = Number(localStorage.coins || 0);
 let level = Number(localStorage.level || 1);
-let kills = Number(localStorage.kills || 0);
-
-// ENERGY
 let energy = Number(localStorage.energy ?? 10);
 
-// DAILY REWARD
-let today = new Date().toDateString();
-if(localStorage.lastReward !== today){
- coins += 50;
- alert("🎁 Daily Reward: +50 coins");
- localStorage.lastReward = today;
-}
+// ================= DAILY REWARD =================
+let lastClaim = Number(localStorage.lastClaim || 0);
+let streak = Number(localStorage.streak || 0);
+const DAY = 86400000;
 
-// MISSIONS
-let mission = JSON.parse(localStorage.mission || "{}");
-if(mission.date !== today){
- mission = {date:today, kills:0, done:false};
-}
+function claimDaily(){
+ let now = Date.now();
 
-// LEADERBOARD
-let board = JSON.parse(localStorage.board || "[]");
-
-// ================= CANVAS =================
-const c = document.getElementById("game");
-const x = c.getContext("2d");
-
-let bullets=[];
-let plane={x:-80,y:80,alive:true};
-
-// ================= FUNCTIONS =================
-function save(){
- localStorage.coins=coins;
- localStorage.level=level;
- localStorage.kills=kills;
- localStorage.energy=energy;
- localStorage.mission=JSON.stringify(mission);
- localStorage.board=JSON.stringify(board);
-}
-
-function hud(){
- document.getElementById("hud").innerText =
- `👤 ${username} | 🪙 ${coins} | ⚡ ${energy} | ⭐ ${level}`;
-}
-
-function shoot(){
- if(energy<=0){
-  alert("⚡ No energy, wait!");
+ if(now - lastClaim < DAY){
+  alert("⏳ Daily reward not ready yet!");
   return;
  }
- energy--;
- bullets.push({x:180,y:420});
- save(); hud();
+
+ streak++;
+ let reward = 50 + (streak * 10);
+ coins += reward;
+
+ lastClaim = now;
+ localStorage.lastClaim = lastClaim;
+ localStorage.streak = streak;
+ localStorage.coins = coins;
+
+ alert(`🎁 Daily Reward!\n+${reward} coins\n🔥 Streak: ${streak} days`);
+ updateHUD();
 }
 
-function showMissions(){
- let txt = "🎯 DAILY MISSION\n";
- txt += "Shoot 5 planes\n";
- txt += `Progress: ${mission.kills}/5\n`;
- txt += mission.done ? "✅ Completed" : "❌ Not done";
- alert(txt);
+function updateDailyText(){
+ let now = Date.now();
+ let diff = DAY - (now - lastClaim);
+
+ if(diff <= 0){
+  document.getElementById("daily").innerText =
+  `🎁 Daily reward READY | 🔥 Streak: ${streak}`;
+ }else{
+  let h = Math.floor(diff/3600000);
+  let m = Math.floor((diff%3600000)/60000);
+  document.getElementById("daily").innerText =
+  `⏳ Next reward in ${h}h ${m}m | 🔥 Streak: ${streak}`;
+ }
+}
+
+// ================= LEADERBOARD =================
+let board = JSON.parse(localStorage.board || "[]");
+
+function updateBoard(){
+ board = board.filter(p=>p.id!==userid);
+ board.push({id:userid,name:username,coins:coins});
+ board.sort((a,b)=>b.coins-a.coins);
+ board = board.slice(0,10);
+ localStorage.board = JSON.stringify(board);
 }
 
 function showLeaderboard(){
@@ -128,22 +125,40 @@ function showLeaderboard(){
  alert(txt);
 }
 
-function updateBoard(){
- board = board.filter(p=>p.id!==userid);
- board.push({id:userid,name:username,coins:coins});
- board.sort((a,b)=>b.coins-a.coins);
- board = board.slice(0,10);
+// ================= HUD =================
+function updateHUD(){
+ document.getElementById("hud").innerText =
+ `👤 ${username} | 🪙 ${coins} | ⚡ ${energy} | ⭐ ${level}`;
+ updateDailyText();
 }
 
-// ENERGY REGEN
+// ================= ENERGY =================
 setInterval(()=>{
- if(energy<10){
+ if(energy < 10){
   energy++;
-  save(); hud();
+  localStorage.energy = energy;
+  updateHUD();
  }
 },60000);
 
-// ================= GAME LOOP =================
+// ================= GAME =================
+const c = document.getElementById("game");
+const x = c.getContext("2d");
+
+let bullets=[];
+let plane={x:-80,y:80,alive:true};
+
+function shoot(){
+ if(energy<=0){
+  alert("⚡ No energy!");
+  return;
+ }
+ energy--;
+ bullets.push({x:180,y:420});
+ localStorage.energy = energy;
+ updateHUD();
+}
+
 function spawnPlane(){
  plane.x=-80;
  plane.y=60+Math.random()*120;
@@ -185,18 +200,10 @@ function loop(){
     bullets.splice(i,1);
 
     coins+=10;
-    kills++;
-    mission.kills++;
+    if(coins%50===0) level++;
 
-    if(mission.kills>=5 && !mission.done){
-     coins+=100;
-     mission.done=true;
-     alert("🎯 Mission complete! +100 coins");
-    }
-
-    if(kills%5===0) level++;
-
-    save(); hud();
+    localStorage.coins = coins;
+    updateHUD();
     setTimeout(spawnPlane,800);
   }
 
@@ -206,7 +213,7 @@ function loop(){
  requestAnimationFrame(loop);
 }
 
-hud();
+updateHUD();
 loop();
 </script>
 
