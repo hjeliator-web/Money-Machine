@@ -8,8 +8,11 @@
 <!-- Telegram -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-<!-- Monetag SDK (ONLY ONCE) -->
-<script src="//libtl.com/sdk.js" data-zone="10388714" data-sdk="show_10388714"></script>
+<!-- Monetag SDK (DO NOT CALL DIRECTLY) -->
+<script src="//libtl.com/sdk.js"
+ data-zone="10388714"
+ data-sdk="show_10388714"
+ data-auto="false"></script>
 
 <style>
 body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden}
@@ -32,6 +35,11 @@ canvas{display:block;margin:auto;background:#111;margin-top:50px}
  display:inline-block;border:2px solid #555
 }
 .locked{opacity:.3}
+.footer{
+ position:fixed;bottom:5px;width:100%;
+ text-align:center;font-size:11px;color:#aaa
+}
+.footer a{color:#aaa;margin:0 5px}
 </style>
 </head>
 
@@ -74,23 +82,19 @@ canvas{display:block;margin:auto;background:#111;margin-top:50px}
  <button onclick="restart()">Restart</button>
 </div>
 
+<div class="footer">
+ <a href="privacy.html" target="_blank">Privacy</a> |
+ <a href="terms.html" target="_blank">Terms</a> |
+ <a href="contact.html" target="_blank">Contact</a>
+</div>
+
 <script>
 Telegram.WebApp.expand();
-
- <hr>
-<a href="privacy.html" target="_blank">Privacy Policy</a><br>
-<a href="terms.html" target="_blank">Terms of Service</a><br>
-<a href="contact.html" target="_blank">Contact</a>
-
 
 /* ---------- DATA ---------- */
 const colors=[
 "cyan","red","lime","yellow","orange","pink","purple","gold",
-"#00f","#0ff","#f0f","#ff0","#f80","#8f0","#0f8","#80f",
-"#ccc","#f44","#4f4","#44f","#fa0","#0af","#af0","#f0a",
-"#999","#f66","#6f6","#66f","#fb0","#0bf","#bf0","#f0b",
-"#aaa","#f88","#8f8","#88f","#fd0","#0df","#df0","#f0d",
-"#bbb","#faa","#afa","#aaf","#fe0","#0ef"
+"#00f","#0ff","#f0f","#ff0","#f80","#8f0","#0f8","#80f"
 ];
 
 let save=JSON.parse(localStorage.getItem("mmSave"))||{
@@ -109,40 +113,24 @@ let skinAds=0;
 const c=document.getElementById("game");
 const ctx=c.getContext("2d");
 
-/* ---------- SAVE ---------- */
-function saveData(){
- localStorage.setItem("mmSave",JSON.stringify({
-  coins,level,speed,skin,unlocked
- }));
-}
-
 /* ---------- HUD ---------- */
 function hud(){
  document.getElementById("hud").innerText=`💰${coins} | Lv ${level}`;
- saveData();
+ localStorage.setItem("mmSave",JSON.stringify({coins,level,speed,skin,unlocked}));
 }
 hud();
 
 /* ---------- GAME ---------- */
-function shoot(){
- bullets.push({x:player.x+12,y:player.y});
-}
+function shoot(){bullets.push({x:player.x+12,y:player.y})}
 
 document.onkeydown=e=>{
- if(e.key=="ArrowLeft")player.x-=speed*(sensitivity/5);
- if(e.key=="ArrowRight")player.x+=speed*(sensitivity/5);
- if(e.key==" ")shoot();
+ if(e.key==="ArrowLeft")player.x-=speed*(sensitivity/5);
+ if(e.key==="ArrowRight")player.x+=speed*(sensitivity/5);
+ if(e.key===" ")shoot();
 };
 
 function spawnEnemy(){
- enemies.push({
-  x:Math.random()*330,y:-30,
-  s:25,hp:2,sp:2+level*0.2,b:false
- });
-}
-
-function spawnBoss(){
- enemies.push({x:80,y:-120,s:100,hp:120,sp:1,b:true});
+ enemies.push({x:Math.random()*330,y:-30,s:25,hp:2,sp:2+level*0.2,b:false});
 }
 
 function loop(){
@@ -161,84 +149,41 @@ function loop(){
 
  enemies.forEach((e,i)=>{
   e.y+=e.sp;
-  ctx.fillStyle=e.b?"purple":"orange";
+  ctx.fillStyle="orange";
   ctx.fillRect(e.x,e.y,e.s,e.s);
-
-  bullets.forEach((b,bi)=>{
-   if(b.x<e.x+e.s&&b.x+5>e.x&&b.y<e.y+e.s){
-    e.hp--; bullets.splice(bi,1);
-    if(e.hp<=0){
-     coins+=e.b?200:5;
-     enemies.splice(i,1);
-     if(e.b){boss=false;level++;}
-    }
-   }
-  });
-
-  if(player.x<e.x+e.s&&player.x+30>e.x&&
-     player.y<e.y+e.s&&player.y+30>e.y){
-   endGame();
-  }
  });
 
- if(!boss && Math.random()<0.03)spawnEnemy();
- if(level>=10 && !boss){boss=true;spawnBoss();}
-
+ if(Math.random()<0.03)spawnEnemy();
  hud();
  requestAnimationFrame(loop);
 }
 loop();
-
-/* ---------- GAME OVER ---------- */
-function endGame(){
- game=false;
- gameover.style.display="block";
-}
-function restart(){location.reload();}
 
 /* ---------- MENUS ---------- */
 function openShop(){shop.style.display="block";renderSkins();}
 function closeShop(){shop.style.display="none";}
 function openSettings(){settings.style.display="block";}
 function closeSettings(){settings.style.display="none";}
+function restart(){location.reload();}
 
-/* ---------- MONETAG REWARDED POPUP ---------- */
-
- function watchRewardAd(rewardType, skinIndex = null) {
-
-  show_10388714('pop').then(() => {
-    // user watched or closed ad
-    giveReward(rewardType, skinIndex);
-  }).catch(e => {
-    console.log("Ad error:", e);
-  });
-
+/* ---------- MONETAG REWARD (ONLY ON CLICK) ---------- */
+function watchRewardAd(type, skinIndex=null){
+ show_10388714('pop')
+ .then(()=>giveReward(type, skinIndex))
+ .catch(e=>console.log("Ad error",e));
 }
 
-
 function giveReward(type, skinIndex){
- if(type==="speed"){
-  speed+=2;
-  alert("⚡ Speed upgraded!");
- }
-
- if(type==="daily"){
-  coins+=100;
-  alert("🎁 Daily reward!");
- }
-
+ if(type==="speed") speed+=2;
+ if(type==="daily") coins+=100;
  if(type==="skin"){
   skinAds++;
   if(skinAds>=2){
    unlocked.push(skinIndex);
    skin=skinIndex;
    skinAds=0;
-   alert("🎨 Skin unlocked!");
-  }else{
-   alert("Watch 1 more ad to unlock skin");
   }
  }
-
  hud();
  renderSkins();
 }
@@ -250,10 +195,7 @@ function renderSkins(){
   let d=document.createElement("div");
   d.className="skin"+(unlocked.includes(i)?"":" locked");
   d.style.background=c;
-  d.onclick=()=>{
-   if(unlocked.includes(i))skin=i;
-   else watchRewardAd("skin",i);
-  };
+  d.onclick=()=>unlocked.includes(i)?skin=i:watchRewardAd("skin",i);
   skins.appendChild(d);
  });
 }
