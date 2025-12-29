@@ -63,7 +63,7 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 // ================= PLAYER =================
-let player = { x:160, y:460, speed:6 };
+let player = { x:160, y:460, speed:12 };
 
 // ================= OBJECTS =================
 let bullets = [];
@@ -142,6 +142,22 @@ function spawnCoin(){
  fallingCoins.push({x:Math.random()*320,y:-20});
 }
 
+
+
+// --------------Joystick-------------
+
+
+
+<div id="joystick">
+ <div id="stick"></div>
+</div>
+
+
+
+
+
+
+ 
 // ================= SPAWN POWER =================
 function spawnPower(){
  powerups.push({
@@ -286,8 +302,72 @@ setInterval(()=>{ if(!gameOver) spawnCoin(); },800);
 setInterval(()=>{ if(!gameOver && Math.random()>0.7) spawnPower(); },6000);
 setInterval(()=>{ if(!gameOver && !boss) spawnBoss(); },30000);
 
+
+// ================= Joystick =================
+
+#joystick{
+ width:120px;
+ height:120px;
+ background:rgba(255,255,255,0.15);
+ border-radius:50%;
+ position:fixed;
+ bottom:20px;
+ left:20px;
+ touch-action:none;
+}
+#stick{
+ width:50px;
+ height:50px;
+ background:#00e5ff;
+ border-radius:50%;
+ position:absolute;
+ top:35px;
+ left:35px;
+}
+
+// ================= Joystick fast =================
+let joy = document.getElementById("joystick");
+let stick = document.getElementById("stick");
+let dragging = false;
+let center = {x:60,y:60};
+
+joy.addEventListener("touchstart", e=>{
+ dragging = true;
+});
+
+joy.addEventListener("touchmove", e=>{
+ if(!dragging) return;
+ let rect = joy.getBoundingClientRect();
+ let x = e.touches[0].clientX - rect.left;
+ let dx = x - center.x;
+
+ // FAST MOVEMENT
+ player.x += dx * 0.25;
+
+ if(player.x < 0) player.x = 0;
+ if(player.x > 330) player.x = 330;
+
+ stick.style.left = (35 + dx*0.3) + "px";
+});
+
+joy.addEventListener("touchend", ()=>{
+ dragging = false;
+ stick.style.left = "35px";
+});
+
+
+
+ 
 // START
 loop();
+
+
+
+
+
+
+
+ 
 </script>
 
 </body>
