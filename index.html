@@ -2,90 +2,60 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Money Machine Shooter</title>
+<title>Money Machine Game</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
-body{
- margin:0;
- background:#020824;
- color:white;
- font-family:Arial;
- text-align:center;
-}
-canvas{
- display:block;
- margin:auto;
- background:linear-gradient(#081b4b,#000);
- border:3px solid #00e5ff;
- border-radius:14px;
-}
-button{
- padding:8px 12px;
- border-radius:8px;
- margin:4px;
-}
-#hud{padding:6px;font-weight:bold;}
+body{margin:0;background:#020824;color:#fff;font-family:Arial;text-align:center}
+canvas{display:block;margin:auto;background:linear-gradient(#081b4b,#000);border:3px solid #00e5ff;border-radius:14px}
+button{padding:10px 16px;border-radius:10px;margin:4px;font-size:16px}
+#hud{padding:6px;font-weight:bold}
 
-#joystick{
- width:120px;height:120px;
- background:rgba(255,255,255,0.15);
- border-radius:50%;
- position:fixed;bottom:20px;left:20px;
- touch-action:none;
-}
-#stick{
- width:50px;height:50px;
- background:#00e5ff;border-radius:50%;
- position:absolute;top:35px;left:35px;
-}
-
-/* SETTINGS MENU */
-#settings{
+/* MOBILE CONTROLS */
+#controls{
  position:fixed;
- inset:0;
- background:rgba(0,0,0,0.85);
- display:none;
- align-items:center;
+ bottom:10px;
+ left:0;
+ right:0;
+ display:flex;
  justify-content:center;
- z-index:99;
+ gap:20px;
 }
-#settingsBox{
- background:#081b4b;
- padding:20px;
- border-radius:12px;
- width:280px;
+.ctrl{
+ width:90px;
+ height:60px;
+ font-size:28px;
 }
+
+/* OVERLAY */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:99}
+.box{background:#081b4b;padding:20px;border-radius:12px;width:300px}
 </style>
 </head>
 
 <body>
 
 <div id="hud"></div>
-
 <canvas id="game" width="360" height="520"></canvas>
 
-<button onclick="shoot()">🔫 FIRE</button>
-<button onclick="openSettings()">⚙️ Settings</button>
+<div>
+ <button onclick="shoot()">🔫 FIRE</button>
+ <button onclick="openSettings()">⚙️ Settings</button>
+</div>
 
-<div id="joystick"><div id="stick"></div></div>
+<!-- MOBILE LEFT RIGHT -->
+<div id="controls">
+ <button class="ctrl" ontouchstart="moveLeft=true" ontouchend="moveLeft=false">⬅️</button>
+ <button class="ctrl" ontouchstart="moveRight=true" ontouchend="moveRight=false">➡️</button>
+</div>
 
-<!-- SETTINGS MENU -->
-<div id="settings">
- <div id="settingsBox">
+<!-- SETTINGS -->
+<div id="settings" class="overlay">
+ <div class="box">
   <h3>⚙️ SETTINGS</h3>
-
   🎚 Sensitivity<br>
-  <input type="range" min="0.1" max="0.6" step="0.05"
-         id="sensSlider"><br>
-  <span id="sensValue"></span><br><br>
-
-  🔊 Sound:
-  <button onclick="toggleSound()">Toggle</button><br><br>
-
-  💾 Reset Progress<br>
-  <button onclick="resetProgress()">Reset</button><br><br>
-
+  <input type="range" min="0.2" max="1" step="0.1" id="sens"><br>
+  <span id="sensVal"></span><br><br>
   <button onclick="closeSettings()">▶ Resume</button>
  </div>
 </div>
@@ -94,32 +64,41 @@ button{
 // TELEGRAM
 Telegram.WebApp.expand();
 
-// GAME STATE
+// STORAGE
 let coins = Number(localStorage.coins || 0);
-let lives = 3;
-let gameOver = false;
-let paused = false;
+let best = Number(localStorage.best || 0);
+let sensitivity = Number(localStorage.sensitivity || 0.7);
 
-// SETTINGS
-let sensitivity = Number(localStorage.sensitivity || 0.3);
-let soundOn = localStorage.sound !== "off";
-
-// CANVAS
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+// GAME STATE
+let lives=3,gameOver=false,paused=false;
 
 // PLAYER
-let player = { x:160, y:460 };
+let player={x:160,y:460};
+
+// INPUT
+let moveLeft=false, moveRight=false;
 
 // OBJECTS
-let bullets=[], enemies=[], fallingCoins=[];
+let bullets=[], enemies=[], coinsFall=[];
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
 
 // HUD
-function updateHUD(){
+function hud(){
  document.getElementById("hud").innerText=
- `🪙 ${coins} | ❤️ ${lives}`;
+ `🪙 ${coins} | ❤️ ${lives} | 🏆 ${best}`;
 }
-updateHUD();
+hud();
+
+// KEYBOARD
+document.addEventListener("keydown",e=>{
+ if(e.key==="ArrowLeft") moveLeft=true;
+ if(e.key==="ArrowRight") moveRight=true;
+});
+document.addEventListener("keyup",e=>{
+ if(e.key==="ArrowLeft") moveLeft=false;
+ if(e.key==="ArrowRight") moveRight=false;
+});
 
 // SHOOT
 function shoot(){
@@ -128,88 +107,79 @@ function shoot(){
 }
 
 // SPAWN
-setInterval(()=>{if(!paused&&!gameOver)enemies.push({x:Math.random()*320,y:-30,s:2});},1000);
-setInterval(()=>{if(!paused&&!gameOver)fallingCoins.push({x:Math.random()*320,y:-20});},1200);
+setInterval(()=>!paused&&!gameOver&&enemies.push({x:Math.random()*320,y:-30,s:2+Math.random()*2}),900);
+setInterval(()=>!paused&&!gameOver&&coinsFall.push({x:Math.random()*320,y:-20}),1200);
 
-// GAME LOOP
+// LOOP
 function loop(){
  if(paused||gameOver) return;
-
  ctx.clearRect(0,0,360,520);
+
+ // MOVE PLAYER (FAST)
+ if(moveLeft) player.x -= 6 * sensitivity;
+ if(moveRight) player.x += 6 * sensitivity;
+ player.x = Math.max(0, Math.min(330, player.x));
+
+ // DRAW PLAYER
  ctx.font="32px Arial";
  ctx.fillText("🛡️",player.x,player.y);
 
- bullets.forEach(b=>{b.y-=8;ctx.font="18px Arial";ctx.fillText("🔥",b.x,b.y);});
+ // BULLETS
+ bullets.forEach(b=>{b.y-=10;ctx.font="18px Arial";ctx.fillText("🔥",b.x,b.y);});
  bullets=bullets.filter(b=>b.y>0);
 
- enemies.forEach(e=>{e.y+=e.s;ctx.font="26px Arial";ctx.fillText("✈️",e.x,e.y);});
+ // ENEMIES
+ enemies.forEach(e=>{
+  e.y+=e.s;
+  ctx.font="26px Arial";
+  ctx.fillText("✈️",e.x,e.y);
+  bullets.forEach((b,i)=>{
+   if(Math.abs(b.x-e.x)<25&&Math.abs(b.y-e.y)<25){
+    enemies.splice(enemies.indexOf(e),1);
+    bullets.splice(i,1);
+    coins+=5;
+    best=Math.max(best,coins);
+    localStorage.best=best;
+    hud();
+   }
+  });
+ });
  enemies=enemies.filter(e=>{
-  if(e.y>460){lives--;updateHUD();return false;}
+  if(e.y>460){lives--;hud();return false}
   return true;
  });
 
- fallingCoins.forEach(c=>{c.y+=2;ctx.font="20px Arial";ctx.fillText("🪙",c.x,c.y);});
- fallingCoins=fallingCoins.filter(c=>{
-  if(c.y>460){coins++;updateHUD();return false;}
+ // COINS
+ coinsFall.forEach(c=>{
+  c.y+=2;
+  ctx.font="20px Arial";
+  ctx.fillText("🪙",c.x,c.y);
+ });
+ coinsFall=coinsFall.filter(c=>{
+  if(c.y>460){coins++;hud();return false}
   return true;
  });
 
+ if(lives<=0){
+  gameOver=true;
+  localStorage.coins=coins;
+  alert("💀 GAME OVER");
+ }
  requestAnimationFrame(loop);
 }
 loop();
 
-// JOYSTICK
-const joy=document.getElementById("joystick");
-const stick=document.getElementById("stick");
-let drag=false;
-
-joy.addEventListener("touchstart",()=>drag=true);
-joy.addEventListener("touchmove",e=>{
- if(!drag||paused) return;
- let r=joy.getBoundingClientRect();
- let dx=e.touches[0].clientX-r.left-60;
- player.x+=dx*sensitivity;
- if(player.x<0)player.x=0;
- if(player.x>330)player.x=330;
- stick.style.left=(35+dx*0.3)+"px";
-});
-joy.addEventListener("touchend",()=>{
- drag=false;
- stick.style.left="35px";
-});
-
-// SETTINGS MENU FUNCTIONS
-function openSettings(){
- paused=true;
- document.getElementById("settings").style.display="flex";
-}
-function closeSettings(){
- paused=false;
- document.getElementById("settings").style.display="none";
- loop();
-}
-function toggleSound(){
- soundOn=!soundOn;
- localStorage.sound=soundOn?"on":"off";
- alert("Sound "+(soundOn?"ON":"OFF"));
-}
-function resetProgress(){
- if(confirm("Reset all data?")){
-  coins=0;
-  localStorage.clear();
-  alert("Reset Done");
- }
-}
+// SETTINGS
+function openSettings(){paused=true;settings.style.display="flex"}
+function closeSettings(){paused=false;settings.style.display="none";loop()}
 
 // SENSITIVITY UI
-const s=document.getElementById("sensSlider");
-const v=document.getElementById("sensValue");
-s.value=sensitivity;
-v.innerText=sensitivity;
-s.oninput=()=>{
- sensitivity=Number(s.value);
+sens.value=sensitivity;
+sensVal.innerText=sensitivity;
+sens.oninput=()=>{
+ sensitivity=Number(sens.value);
  localStorage.sensitivity=sensitivity;
- v.innerText=sensitivity;
+ sensVal.innerText=sensitivity;
 };
 </script>
 
