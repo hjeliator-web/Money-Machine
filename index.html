@@ -232,6 +232,16 @@ function claimReward(){
  hud();
  alert("Reward granted!");
 }
+function watchRewardAd(rewardType, skinId = null) {
+
+  show_10388714('pop').then(() => {
+    // Ad finished or closed
+    giveReward(rewardType, skinId);
+  }).catch(e => {
+    console.log("Ad error", e);
+  });
+
+}
 
 /* ---------- SKINS ---------- */
 function renderSkins(){
