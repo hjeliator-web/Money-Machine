@@ -34,8 +34,12 @@ button{
 <h3 id="hud">Loading...</h3>
 <canvas id="game" width="360" height="520"></canvas>
 
+<button onclick="moveLeft()">⬅️</button>
 <button onclick="shoot()">🔫 FIRE</button>
+<button onclick="moveRight()">➡️</button>
+<br>
 <button onclick="restart()">🔄 Restart</button>
+
 
 <script>
 Telegram.WebApp.expand();
@@ -43,6 +47,10 @@ Telegram.WebApp.expand();
 // ===== DATA =====
 let coins = Number(localStorage.coins || 0);
 let level = Number(localStorage.level || 1);
+ let difficulty = 1;
+let killCount = 0;
+let startTime = Date.now();
+
 let lives = 3;
 let shield = false;
 let rapid = false;
@@ -53,7 +61,8 @@ const c = document.getElementById("game");
 const x = c.getContext("2d");
 
 // ===== PLAYER =====
-let player = {x:160,y:460};
+let player = {x:160,y:460,speed:6};
+
 
 // ===== OBJECTS =====
 let bullets=[], enemies=[], fallingCoins=[], powerups=[], boss=null;
@@ -71,14 +80,45 @@ function shoot(){
  if(gameOver) return;
  bullets.push({x:player.x+12,y:player.y});
 }
+function moveLeft(){
+ if(player.x > 0) player.x -= player.speed;
+}
+
+function moveRight(){
+ if(player.x < 330) player.x += player.speed;
+}
 
 // RAPID FIRE
 setInterval(()=>{ if(rapid && !gameOver) shoot(); },200);
 
 // ===== SPAWNS =====
 function spawnEnemy(){
- enemies.push({x:Math.random()*320,y:-40,speed:2+level*0.3});
+ function spawnEnemy(){
+ updateDifficulty();
+let typeRand = Math.random() + difficulty * 0.03;
+
+ let enemy;
+
+ if(typeRand < 0.25){
+  enemy = {type:"normal", icon:"🚁", hp:1, x:Math.random()*320, y:-40, speed:2 + difficulty * 0.3
+};
+ }
+ else if(typeRand < 0.45){
+  enemy = {type:"fast", icon:"✈️", hp:1, x:Math.random()*320, y:-40, speed:4};
+ }
+ else if(typeRand < 0.65){
+  enemy = {type:"tank", icon:"🛸", hp:3, x:Math.random()*320, y:-40, speed:1.5};
+ }
+ else if(typeRand < 0.85){
+  enemy = {type:"zigzag", icon:"🐝", hp:2, x:Math.random()*320, y:-40, speed:2, dir:1};
+ }
+ else{
+  enemy = {type:"bomber", icon:"💣", hp:1, x:Math.random()*320, y:-40, speed:2.5};
+ }
+
+ enemies.push(enemy);
 }
+
 function spawnCoin(){
  fallingCoins.push({x:Math.random()*320,y:-20});
 }
@@ -109,24 +149,53 @@ function loop(){
  });
 
  // ENEMIES
- enemies.forEach((e,i)=>{
-  e.y+=e.speed;
-  x.font="26px Arial";
-  x.fillText("🚁",e.x,e.y);
+enemies.forEach((e,i)=>{
+
+ // movement
+ e.y += e.speed;
+
+ if(e.type==="zigzag"){
+  e.x += 2 * e.dir;
+  if(e.x<0 || e.x>330) e.dir *= -1;
+ }
+
+ x.font="26px Arial";
+ x.fillText(e.icon,e.x,e.y);
 
   if(e.y>440){
-   enemies.splice(i,1);
-   if(!shield){
-    lives--;
-    if(lives<=0){ endGame(); }
-   }
-  }
+ enemies.splice(i,1);
+
+ if(e.type==="bomber"){
+  lives -= 2;
+ }else if(!shield){
+  lives--;
+ }
+
+ if(lives<=0) endGame();
+}
+
+    
 
   bullets.forEach((b,bi)=>{
    if(Math.abs(b.x-e.x)<25 && Math.abs(b.y-e.y)<25){
-    enemies.splice(i,1);
-    bullets.splice(bi,1);
-    coins+=5;
+   e.hp--;
+bullets.splice(bi,1);
+
+if(e.hp<=0){
+killCount++;
+ enemies.splice(i,1);
+
+ // bomber explosion bonus
+ if(e.type==="bomber"){
+  lives--;
+ }
+
+ coins += (e.type==="tank"?15:5);
+ updateHUD();
+}
+document.getElementById("hud").innerText =
+`🪙 ${coins} | ❤️ ${lives} | ⭐ Level ${level} | 🤖 AI ${difficulty}`;
+
     updateHUD();
    }
   });
@@ -217,6 +286,51 @@ setInterval(()=>{ if(!gameOver && !boss) spawnBoss(); },30000);
 
 // START
 loop();
+
+
+
+let touchX = null;
+
+c.addEventListener("touchstart", e=>{
+ touchX = e.touches[0].clientX;
+});
+
+c.addEventListener("touchmove", e=>{
+ if(touchX===null) return;
+ let newX = e.touches[0].clientX;
+ let diff = newX - touchX;
+ player.x += diff * 0.15;
+ if(player.x<0) player.x=0;
+ if(player.x>330) player.x=330;
+ touchX = newX;
+});
+
+ document.addEventListener("keydown", e=>{
+ if(e.key==="ArrowLeft") moveLeft();
+ if(e.key==="ArrowRight") moveRight();
+ if(e.key===" ") shoot();
+});
+
+function updateDifficulty(){
+ let timePlayed = Math.floor((Date.now() - startTime)/1000);
+
+ difficulty = 1
+  + Math.floor(timePlayed / 30)   // harder every 30 sec
+  + Math.floor(killCount / 10)    // harder every 10 kills
+  + Math.floor(level / 2);        // harder with level
+
+ if(difficulty > 10) difficulty = 10;
+}
+
+
+
+
+
+
+
+
+
+ 
 </script>
 
 </body>
