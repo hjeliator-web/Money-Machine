@@ -5,12 +5,12 @@
 <title>Money Machine</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<!-- Telegram -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src='//libtl.com/sdk.js' data-zone='10388714' data-sdk='show_10388714'></script>
 
+<!-- Monetag SDK (ONLY ONCE) -->
+<script src="//libtl.com/sdk.js" data-zone="10388714" data-sdk="show_10388714"></script>
 
-
-    
 <style>
 body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden}
 header{
@@ -32,7 +32,6 @@ canvas{display:block;margin:auto;background:#111;margin-top:50px}
  display:inline-block;border:2px solid #555
 }
 .locked{opacity:.3}
-@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
 </style>
 </head>
 
@@ -43,7 +42,7 @@ canvas{display:block;margin:auto;background:#111;margin-top:50px}
  <button onclick="shoot()">🔥</button>
  <button onclick="openShop()">🛒</button>
  <button onclick="openSettings()">⚙️</button>
- <button onclick="dailyReward()">🎁</button>
+ <button onclick="watchRewardAd('daily')">🎁</button>
 </header>
 
 <canvas id="game" width="360" height="600"></canvas>
@@ -51,12 +50,11 @@ canvas{display:block;margin:auto;background:#111;margin-top:50px}
 <!-- SHOP -->
 <div id="shop" class="menu">
  <h3>🛒 Shop</h3>
- <button onclick="watchAd('speed')">⚡ Speed (1 Ad)</button>
+ <button onclick="watchRewardAd('speed')">⚡ Speed (1 Ad)</button>
  <hr>
  <h3>🎨 Skins (2 Ads)</h3>
  <div id="skins"></div>
- <p id="adStatus"></p>
- <button onclick="claimReward()">✅ Claim Reward</button><br><br>
+ <br>
  <button onclick="closeShop()">Close</button>
 </div>
 
@@ -64,7 +62,8 @@ canvas{display:block;margin:auto;background:#111;margin-top:50px}
 <div id="settings" class="menu">
  <h3>⚙️ Settings</h3>
  Sensitivity
- <input type="range" min="1" max="10" value="5" oninput="sensitivity=this.value">
+ <input type="range" min="1" max="10" value="5"
+ oninput="sensitivity=this.value">
  <br><br>
  <button onclick="closeSettings()">Close</button>
 </div>
@@ -72,7 +71,6 @@ canvas{display:block;margin:auto;background:#111;margin-top:50px}
 <!-- GAME OVER -->
 <div id="gameover" class="menu">
  <h2>GAME OVER</h2>
- <div id="leaderboard"></div><br>
  <button onclick="restart()">Restart</button>
 </div>
 
@@ -96,10 +94,11 @@ let save=JSON.parse(localStorage.getItem("mmSave"))||{
 let coins=save.coins,level=save.level,speed=save.speed;
 let skin=save.skin,unlocked=save.unlocked;
 let sensitivity=5;
+
 let bullets=[],enemies=[];
 let player={x:160,y:520,w:30,h:30};
 let boss=false,game=true;
-let pendingReward=null,skinAds=0;
+let skinAds=0;
 
 const c=document.getElementById("game");
 const ctx=c.getContext("2d");
@@ -113,14 +112,15 @@ function saveData(){
 
 /* ---------- HUD ---------- */
 function hud(){
- document.getElementById("hud").innerText=
- `💰${coins} | Lv ${level}`;
+ document.getElementById("hud").innerText=`💰${coins} | Lv ${level}`;
  saveData();
 }
 hud();
 
 /* ---------- GAME ---------- */
-function shoot(){bullets.push({x:player.x+12,y:player.y})}
+function shoot(){
+ bullets.push({x:player.x+12,y:player.y});
+}
 
 document.onkeydown=e=>{
  if(e.key=="ArrowLeft")player.x-=speed*(sensitivity/5);
@@ -131,9 +131,7 @@ document.onkeydown=e=>{
 function spawnEnemy(){
  enemies.push({
   x:Math.random()*330,y:-30,
-  s:Math.random()>.85?40:25,
-  hp:Math.random()>.85?6:2,
-  sp:2+level*.2,b:false
+  s:25,hp:2,sp:2+level*0.2,b:false
  });
 }
 
@@ -171,15 +169,14 @@ function loop(){
    }
   });
 
-  if(
-   player.x<e.x+e.s&&player.x+30>e.x&&
-   player.y<e.y+e.s&&player.y+30>e.y
-  ) endGame();
+  if(player.x<e.x+e.s&&player.x+30>e.x&&
+     player.y<e.y+e.s&&player.y+30>e.y){
+   endGame();
+  }
  });
 
  if(!boss && Math.random()<0.03)spawnEnemy();
- if(level==10&&!boss){boss=true;spawnBoss();}
- if(coins>level*70&&!boss)level++;
+ if(level>=10 && !boss){boss=true;spawnBoss();}
 
  hud();
  requestAnimationFrame(loop);
@@ -189,12 +186,6 @@ loop();
 /* ---------- GAME OVER ---------- */
 function endGame(){
  game=false;
- let lb=JSON.parse(localStorage.getItem("mmLB"))||[];
- lb.push(coins);
- lb.sort((a,b)=>b-a);
- lb=lb.slice(0,5);
- localStorage.setItem("mmLB",JSON.stringify(lb));
- leaderboard.innerHTML="🏆<br>"+lb.join("<br>");
  gameover.style.display="block";
 }
 function restart(){location.reload();}
@@ -204,43 +195,41 @@ function openShop(){shop.style.display="block";renderSkins();}
 function closeShop(){shop.style.display="none";}
 function openSettings(){settings.style.display="block";}
 function closeSettings(){settings.style.display="none";}
-function dailyReward(){coins+=20;hud();}
 
-/* ---------- MONETAG ADS ---------- */
-function watchAd(type,index=null){
- pendingReward={type,index};
- window.open(""https://js.monetag.com/10388714.js","_blank");
- alert("Watch ad then return and press CLAIM");
+/* ---------- MONETAG REWARDED POPUP ---------- */
+function watchRewardAd(type, skinIndex=null){
+ show_10388714('pop').then(()=>{
+  giveReward(type, skinIndex);
+ }).catch(e=>{
+  console.log("Ad error", e);
+ });
 }
 
-function claimReward(){
- if(!pendingReward){alert("No reward");return;}
+function giveReward(type, skinIndex){
+ if(type==="speed"){
+  speed+=2;
+  alert("⚡ Speed upgraded!");
+ }
 
- if(pendingReward.type=="speed")speed+=2;
+ if(type==="daily"){
+  coins+=100;
+  alert("🎁 Daily reward!");
+ }
 
- if(pendingReward.type=="skin"){
+ if(type==="skin"){
   skinAds++;
   if(skinAds>=2){
-   unlocked.push(pendingReward.index);
-   skin=pendingReward.index;
+   unlocked.push(skinIndex);
+   skin=skinIndex;
    skinAds=0;
+   alert("🎨 Skin unlocked!");
+  }else{
+   alert("Watch 1 more ad to unlock skin");
   }
  }
 
- pendingReward=null;
- renderSkins();
  hud();
- alert("Reward granted!");
-}
-function watchRewardAd(rewardType, skinId = null) {
-
-  show_10388714('pop').then(() => {
-    // Ad finished or closed
-    giveReward(rewardType, skinId);
-  }).catch(e => {
-    console.log("Ad error", e);
-  });
-
+ renderSkins();
 }
 
 /* ---------- SKINS ---------- */
@@ -250,97 +239,14 @@ function renderSkins(){
   let d=document.createElement("div");
   d.className="skin"+(unlocked.includes(i)?"":" locked");
   d.style.background=c;
-  d.style.animation="pulse 1s infinite";
   d.onclick=()=>{
    if(unlocked.includes(i))skin=i;
-   else watchAd("skin",i);
+   else watchRewardAd("skin",i);
   };
   skins.appendChild(d);
  });
 }
 </script>
 
-<body>
-
-  <!-- GAME HTML HERE -->
-
-  <script src="https://js.monetag.com/10388714.js"></script>
-
-  <script>
-    // YOUR FUNCTIONS HERE
-  </script>
-
-</body>
-
-<script>
-const MONETAG_LINK = "
-
-// Rewarded Popup
-
-show_10388714('pop').then(() => {
-    // user watch ad till the end or close it in interstitial format
-    // your code to reward user for rewarded format
-}).catch(e => {
-    // user get error during playing ad
-    // do nothing or whatever you want
-})
-
-        ";
-
-/* store pending reward */
-function watchAd(rewardType, skinId = null) {
-  localStorage.setItem(
-    "pendingReward",
-    JSON.stringify({ rewardType, skinId })
-  );
-
-  // open monetag ONLY after user click
-  window.open(MONETAG_LINK, "_blank");
-
-  alert("📺 Watch the ad, then come back and press CLAIM");
-}
-
-/* claim reward safely */
-function claimReward() {
-  const data = JSON.parse(localStorage.getItem("pendingReward"));
-  if (!data) {
-    alert("❌ No reward pending");
-    return;
-  }
-
-  if (data.rewardType === "speed") {
-    playerSpeed += 2;
-  }
-
-  if (data.rewardType === "skin") {
-    skinAdCount++;
-    if (skinAdCount >= 2) {
-      unlockedSkins.push(data.skinId);
-      currentSkin = data.skinId;
-      skinAdCount = 0;
-    }
-  }
-
-  if (data.rewardType === "daily") {
-    coins += 200;
-  }
-
-  localStorage.removeItem("pendingReward");
-  updateUI();
-  alert("✅ Reward unlocked!");
-}
-</script>
-
-
-
-
-
-
-
-
-
-
-
-    
 </body>
 </html>
