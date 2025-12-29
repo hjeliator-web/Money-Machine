@@ -12,9 +12,20 @@ canvas{background:#111;display:block;margin:auto}
  position:fixed;top:50%;left:50%;
  transform:translate(-50%,-50%);
  background:#222;padding:15px;
- border:2px solid #555;display:none
+ border:2px solid #555;display:none;
+ max-height:80vh;overflow:auto
 }
-select,input{width:100%}
+.skin{
+ display:inline-block;width:40px;height:40px;
+ margin:5px;border:2px solid #555;
+ cursor:pointer
+}
+.locked{opacity:.3}
+@keyframes pulse{
+ 0%{transform:scale(1)}
+ 50%{transform:scale(1.1)}
+ 100%{transform:scale(1)}
+}
 </style>
 </head>
 
@@ -22,8 +33,8 @@ select,input{width:100%}
 
 <div id="ui">
  <div id="hud"></div>
- <button onclick="shoot()">🔥 Shoot</button>
- <button onclick="openShop()">🛒 Shop</button>
+ <button onclick="shoot()">🔥</button>
+ <button onclick="openShop()">🛒</button>
  <button onclick="openSettings()">⚙️</button>
  <button onclick="dailyReward()">🎁</button><br>
  <button onclick="move(-1)">⬅</button>
@@ -34,8 +45,10 @@ select,input{width:100%}
 
 <div id="shop" class="menu">
  <h3>🛒 Shop</h3>
- <button onclick="watchAd('speed')">⚡ Speed (1 Ad)</button><br>
- <button onclick="watchAd('life')">❤️ Extra Life (2 Ads)</button>
+ <button onclick="watchAd('speed')">⚡ Speed (1 Ad)</button>
+ <hr>
+ <h3>🎨 Player Skins (2 Ads)</h3>
+ <div id="skins"></div>
  <p id="adStatus"></p>
  <button onclick="closeShop()">Close</button>
 </div>
@@ -45,14 +58,6 @@ select,input{width:100%}
  Sensitivity
  <input type="range" min="1" max="10" value="5"
  oninput="sensitivity=this.value"><br><br>
-
- Player Skin
- <select onchange="setSkin(this.value)">
-  <option value="cyan">Cyan</option>
-  <option value="red">Red</option>
-  <option value="lime">Green</option>
- </select><br><br>
-
  <button onclick="closeSettings()">Close</button>
 </div>
 
@@ -62,45 +67,47 @@ select,input{width:100%}
  <button onclick="restart()">🔄 Restart</button>
 </div>
 
-<!-- Sounds -->
-<audio id="sndShoot" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
-<audio id="sndHit" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
-<audio id="sndOver" src="https://actions.google.com/sounds/v1/cartoon/boing.ogg"></audio>
-
 <script>
 const c=document.getElementById("game");
 const ctx=c.getContext("2d");
 
-let data=JSON.parse(localStorage.getItem("moneyMachine"))||{
- coins:0,lives:3,level:1,speed:6,skin:"cyan"
+const colors=[
+"cyan","red","lime","yellow","orange","pink","purple","gold",
+"#00f","#0ff","#f0f","#ff0","#f80","#8f0","#0f8","#80f",
+"#ccc","#f44","#4f4","#44f","#fa0","#0af","#af0","#f0a",
+"#999","#f66","#6f6","#66f","#fb0","#0bf","#bf0","#f0b",
+"#aaa","#f88","#8f8","#88f","#fd0","#0df","#df0","#f0d",
+"#bbb","#faa","#afa","#aaf","#fe0","#0ef"
+];
+
+let saveData=JSON.parse(localStorage.getItem("mmSave"))||{
+ coins:0,level:1,speed:6,skin:0,unlocked:[0]
 };
 
 let player={x:160,y:520,w:30,h:30};
 let bullets=[],enemies=[];
-let coins=data.coins,lives=data.lives,level=data.level;
-let speed=data.speed,sensitivity=5;
-let skin=data.skin;
+let coins=saveData.coins,level=saveData.level;
+let speed=saveData.speed,sensitivity=5;
+let skin=saveData.skin;
+let unlocked=saveData.unlocked;
 let game=true,boss=false;
-let ads={speed:0,life:0};
+let adCount={speed:0,skin:0};
 
 function save(){
- localStorage.setItem("moneyMachine",JSON.stringify({
-  coins,lives,level,speed,skin
+ localStorage.setItem("mmSave",JSON.stringify({
+  coins,level,speed,skin,unlocked
  }));
 }
 
 function hud(){
- document.getElementById("hud").innerText=
- `💰${coins} ❤️${lives} 🔥 Level ${level}`;
+ hudEl.innerText=`💰${coins} 🔥 Lv ${level}`;
  save();
 }
+
+const hudEl=document.getElementById("hud");
 hud();
 
-function shoot(){
- bullets.push({x:player.x+12,y:player.y});
- sndShoot.play();
-}
-
+function shoot(){bullets.push({x:player.x+12,y:player.y})}
 function move(d){
  player.x+=d*speed*(sensitivity/5);
  player.x=Math.max(0,Math.min(330,player.x));
@@ -113,25 +120,26 @@ document.onkeydown=e=>{
 };
 
 function spawnEnemy(){
- let t=Math.random();
  enemies.push({
   x:Math.random()*330,y:-30,
-  size:t>0.85?40:25,
-  hp:t>0.85?6:2,
-  speed:2+level*0.15,boss:false
+  s:Math.random()>.85?40:25,
+  hp:Math.random()>.85?6:2,
+  sp:2+level*.2,b:false
  });
 }
 
 function spawnBoss(){
- enemies.push({x:80,y:-100,size:100,hp:80,speed:1,boss:true});
+ enemies.push({x:80,y:-120,s:100,hp:120,sp:1,b:true});
 }
 
 function update(){
  if(!game)return;
  ctx.clearRect(0,0,360,600);
 
- ctx.fillStyle=skin;
- ctx.fillRect(player.x,player.y,player.w,player.h);
+ ctx.fillStyle=colors[skin];
+ ctx.fillRect(player.x,player.y,30,30);
+ ctx.strokeStyle="#fff";
+ ctx.strokeRect(player.x,player.y,30,30);
 
  bullets.forEach((b,i)=>{
   b.y-=12;
@@ -140,33 +148,31 @@ function update(){
   if(b.y<0)bullets.splice(i,1);
  });
 
- enemies.forEach((e,ei)=>{
-  e.y+=e.speed;
-  ctx.fillStyle=e.boss?"purple":"orange";
-  ctx.fillRect(e.x,e.y,e.size,e.size);
+ enemies.forEach((e,i)=>{
+  e.y+=e.sp;
+  ctx.fillStyle=e.b?"purple":"orange";
+  ctx.fillRect(e.x,e.y,e.s,e.s);
 
   bullets.forEach((b,bi)=>{
-   if(b.x<e.x+e.size&&b.x+5>e.x&&b.y<e.y+e.size&&b.y+10>e.y){
+   if(b.x<e.x+e.s&&b.x+5>e.x&&b.y<e.y+e.s){
     e.hp--; bullets.splice(bi,1);
-    sndHit.play();
     if(e.hp<=0){
-     coins+=e.boss?150:5;
-     enemies.splice(ei,1);
-     if(e.boss){boss=false;level++;}
+     coins+=e.b?200:5;
+     enemies.splice(i,1);
+     if(e.b){boss=false;level++;}
     }
    }
   });
 
-  if(e.y>600){
-   enemies.splice(ei,1);
-   lives--;
-   if(lives<=0)endGame();
-  }
+  if(
+   player.x<e.x+e.s&&player.x+30>e.x&&
+   player.y<e.y+e.s&&player.y+30>e.y
+  ) endGame();
  });
 
- if(!boss && Math.random()<0.02)spawnEnemy();
+ if(!boss && Math.random()<0.025)spawnEnemy();
  if(level==10 && !boss){boss=true;spawnBoss();}
- if(coins>level*60 && !boss)level++;
+ if(coins>level*70&&!boss)level++;
 
  hud();
  requestAnimationFrame(update);
@@ -175,50 +181,58 @@ update();
 
 function endGame(){
  game=false;
- sndOver.play();
  saveScore();
- showLeaderboard();
  gameover.style.display="block";
 }
 
 function restart(){location.reload();}
 
 function saveScore(){
- let lb=JSON.parse(localStorage.getItem("leaderboard"))||[];
- lb.push({score:coins,date:new Date().toLocaleDateString()});
- lb.sort((a,b)=>b.score-a.score);
+ let lb=JSON.parse(localStorage.getItem("mmLB"))||[];
+ lb.push(coins);
+ lb.sort((a,b)=>b-a);
  lb=lb.slice(0,5);
- localStorage.setItem("leaderboard",JSON.stringify(lb));
+ localStorage.setItem("mmLB",JSON.stringify(lb));
+ leaderboard.innerHTML="🏆<br>"+lb.join("<br>");
 }
 
-function showLeaderboard(){
- let lb=JSON.parse(localStorage.getItem("leaderboard"))||[];
- leaderboard.innerHTML="<h3>🏆 Leaderboard</h3>"+
- lb.map(e=>`💰 ${e.score} (${e.date})`).join("<br>");
-}
-
-function openShop(){shop.style.display="block";}
+function openShop(){shop.style.display="block";renderSkins();}
 function closeShop(){shop.style.display="none";}
 function openSettings(){settings.style.display="block";}
 function closeSettings(){settings.style.display="none";}
+function dailyReward(){coins+=20;hud();}
 
-function setSkin(s){skin=s;save();}
-
-function dailyReward(){coins+=20;alert("🎁 +20 Coins");hud();}
-
-function watchAd(type){
- let need=type=="speed"?1:2;
+function watchAd(type,index){
  adStatus.innerText="Watching ad...";
  setTimeout(()=>{
-  ads[type]++;
-  if(ads[type]>=need){
-   ads[type]=0;
-   if(type=="speed")speed+=2;
-   if(type=="life")lives++;
-   adStatus.innerText="✅ Reward unlocked";
-   hud();
-  }else adStatus.innerText=`Watch ${need-ads[type]} more ads`;
+  if(type=="speed"){speed+=2}
+  if(type=="skin"){
+   adCount.skin++;
+   if(adCount.skin>=2){
+    unlocked.push(index);
+    skin=index;
+    adCount.skin=0;
+   }
+  }
+  adStatus.innerText="✅ Done";
+  renderSkins();
+  hud();
  },5000);
+}
+
+function renderSkins(){
+ skins.innerHTML="";
+ colors.forEach((c,i)=>{
+  let d=document.createElement("div");
+  d.className="skin"+(unlocked.includes(i)?"":" locked");
+  d.style.background=c;
+  d.style.animation="pulse 1s infinite";
+  d.onclick=()=>{
+   if(unlocked.includes(i)){skin=i}
+   else watchAd("skin",i);
+  };
+  skins.appendChild(d);
+ });
 }
 </script>
 
