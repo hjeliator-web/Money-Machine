@@ -14,20 +14,15 @@ body{
 }
 canvas{
  background:linear-gradient(#9adfff,#ffffff);
- border-radius:12px;
+ border-radius:14px;
  border:3px solid #222;
  display:block;
  margin:auto;
 }
-#hud{
- font-size:15px;
+#hud,#missionBox{
+ font-size:14px;
  font-weight:bold;
  padding:6px;
-}
-#daily{
- font-size:14px;
- color:#333;
- margin-bottom:5px;
 }
 button{
  padding:8px 12px;
@@ -35,85 +30,112 @@ button{
  font-size:14px;
  border-radius:8px;
 }
+.shake{
+ animation:shake 0.15s;
+}
+@keyframes shake{
+ 0%{transform:translate(0,0);}
+ 25%{transform:translate(3px,0);}
+ 50%{transform:translate(-3px,0);}
+ 75%{transform:translate(3px,0);}
+}
 </style>
 </head>
 
 <body>
 
 <div id="hud">Loading...</div>
-<div id="daily">Checking daily reward...</div>
+<div id="missionBox">Loading...</div>
 
 <canvas id="game" width="360" height="480"></canvas>
 
 <div>
 <button onclick="shoot()">🔫 Shoot</button>
-<button onclick="claimDaily()">🎁 Daily</button>
+<button onclick="showMissions()">🎯 Missions</button>
+<button onclick="showAd()">📺 Watch Ad</button>
 <button onclick="showLeaderboard()">🏆 Rank</button>
 </div>
 
 <script>
-// ================= TELEGRAM =================
+// ============== TELEGRAM USER ==============
 Telegram.WebApp.expand();
-let tg = Telegram.WebApp;
-let user = tg.initDataUnsafe.user || {};
+let user = Telegram.WebApp.initDataUnsafe.user || {};
 let username = user.first_name || "Player";
 let userid = user.id || Math.floor(Math.random()*99999);
 
-// ================= GAME DATA =================
+// ============== GAME DATA ==============
 let coins = Number(localStorage.coins || 0);
 let level = Number(localStorage.level || 1);
 let energy = Number(localStorage.energy ?? 10);
 
-// ================= DAILY REWARD =================
-let lastClaim = Number(localStorage.lastClaim || 0);
-let streak = Number(localStorage.streak || 0);
-const DAY = 86400000;
+// ============== MISSIONS ==============
+let today = new Date().toDateString();
+let mission = JSON.parse(localStorage.mission || "{}");
+if(mission.date !== today){
+ mission = {date:today, planes:0, coins:0, completed:false};
+}
 
-function claimDaily(){
- let now = Date.now();
+// ============== LEADERBOARD ==============
+let board = JSON.parse(localStorage.board || "[]");
 
- if(now - lastClaim < DAY){
-  alert("⏳ Daily reward not ready yet!");
+// ============== CANVAS ==============
+const c = document.getElementById("game");
+const x = c.getContext("2d");
+
+let bullets=[];
+let coinsAnim=[];
+let plane={x:-80,y:80,alive:true};
+
+// ============== FUNCTIONS ==============
+function save(){
+ localStorage.coins=coins;
+ localStorage.level=level;
+ localStorage.energy=energy;
+ localStorage.mission=JSON.stringify(mission);
+ localStorage.board=JSON.stringify(board);
+}
+
+function updateHUD(){
+ document.getElementById("hud").innerText =
+ `👤 ${username} | 🪙 ${coins} | ⚡ ${energy} | ⭐ ${level}`;
+ document.getElementById("missionBox").innerText =
+ `🎯 ${mission.planes}/5 ✈️ | ${mission.coins}/50 🪙`;
+}
+
+function shoot(){
+ if(energy<=0){
+  alert("⚡ No energy!");
   return;
  }
-
- streak++;
- let reward = 50 + (streak * 10);
- coins += reward;
-
- lastClaim = now;
- localStorage.lastClaim = lastClaim;
- localStorage.streak = streak;
- localStorage.coins = coins;
-
- alert(`🎁 Daily Reward!\n+${reward} coins\n🔥 Streak: ${streak} days`);
- updateHUD();
+ energy--;
+ bullets.push({x:180,y:420});
+ save(); updateHUD();
 }
 
-function updateDailyText(){
- let now = Date.now();
- let diff = DAY - (now - lastClaim);
-
- if(diff <= 0){
-  document.getElementById("daily").innerText =
-  `🎁 Daily reward READY | 🔥 Streak: ${streak}`;
- }else{
-  let h = Math.floor(diff/3600000);
-  let m = Math.floor((diff%3600000)/60000);
-  document.getElementById("daily").innerText =
-  `⏳ Next reward in ${h}h ${m}m | 🔥 Streak: ${streak}`;
- }
+// ============== SAFE AD SYSTEM ==============
+function showAd(){
+ alert("📺 Watching ad...\n(wait 3 seconds)");
+ setTimeout(()=>{
+  coins += 50;
+  alert("🎁 Ad reward: +50 coins");
+  save(); updateHUD();
+ },3000);
 }
 
-// ================= LEADERBOARD =================
-let board = JSON.parse(localStorage.board || "[]");
+function showMissions(){
+ alert(
+ "🎯 DAILY MISSIONS\n"+
+ "✈️ Shoot 5 planes\n"+
+ "🪙 Collect 50 coins\n\n"+
+ (mission.completed?"✅ Completed":"❌ In progress")
+ );
+}
 
 function updateBoard(){
  board = board.filter(p=>p.id!==userid);
  board.push({id:userid,name:username,coins:coins});
  board.sort((a,b)=>b.coins-a.coins);
  board = board.slice(0,10);
- localStorage.board = JSON.stringify(board);
 }
 
 function showLeaderboard(){
@@ -125,40 +147,15 @@ function showLeaderboard(){
  alert(txt);
 }
 
-// ================= HUD =================
-function updateHUD(){
- document.getElementById("hud").innerText =
- `👤 ${username} | 🪙 ${coins} | ⚡ ${energy} | ⭐ ${level}`;
- updateDailyText();
-}
-
-// ================= ENERGY =================
+// ============== ENERGY REGEN ==============
 setInterval(()=>{
- if(energy < 10){
+ if(energy<10){
   energy++;
-  localStorage.energy = energy;
-  updateHUD();
+  save(); updateHUD();
  }
 },60000);
 
-// ================= GAME =================
-const c = document.getElementById("game");
-const x = c.getContext("2d");
-
-let bullets=[];
-let plane={x:-80,y:80,alive:true};
-
-function shoot(){
- if(energy<=0){
-  alert("⚡ No energy!");
-  return;
- }
- energy--;
- bullets.push({x:180,y:420});
- localStorage.energy = energy;
- updateHUD();
-}
-
+// ============== GAME LOOP ==============
 function spawnPlane(){
  plane.x=-80;
  plane.y=60+Math.random()*120;
@@ -177,7 +174,7 @@ function loop(){
  x.font="30px Arial";
  x.fillText("🧑‍🚀",165,420);
 
- // plane
+ // plane (smooth)
  if(plane.alive){
   plane.x+=2+level*0.3;
   x.font="30px Arial";
@@ -185,9 +182,9 @@ function loop(){
   if(plane.x>380) spawnPlane();
  }
 
- // bullets
+ // bullets (animated trail)
  for(let i=bullets.length-1;i>=0;i--){
-  bullets[i].y-=7;
+  bullets[i].y-=8;
   x.font="20px Arial";
   x.fillText("🔥",bullets[i].x,bullets[i].y);
 
@@ -199,15 +196,40 @@ function loop(){
     plane.alive=false;
     bullets.splice(i,1);
 
+    // shake effect
+    c.classList.add("shake");
+    setTimeout(()=>c.classList.remove("shake"),150);
+
     coins+=10;
+    mission.coins+=10;
+    mission.planes++;
+
+    coinsAnim.push({x:plane.x,y:plane.y,life:30});
+
+    if(!mission.completed &&
+       mission.planes>=5 &&
+       mission.coins>=50){
+        mission.completed=true;
+        coins+=100;
+        alert("🎉 Mission complete! +100 coins");
+    }
+
     if(coins%50===0) level++;
 
-    localStorage.coins = coins;
-    updateHUD();
+    save(); updateHUD();
     setTimeout(spawnPlane,800);
   }
 
   if(bullets[i] && bullets[i].y<0) bullets.splice(i,1);
+ }
+
+ // coin animation
+ for(let i=coinsAnim.length-1;i>=0;i--){
+  coinsAnim[i].y -= 1;
+  coinsAnim[i].life--;
+  x.font="18px Arial";
+  x.fillText("🪙",coinsAnim[i].x,coinsAnim[i].y);
+  if(coinsAnim[i].life<=0) coinsAnim.splice(i,1);
  }
 
  requestAnimationFrame(loop);
