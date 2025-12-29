@@ -2,138 +2,179 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Money Machine Game</title>
+<title>Money Machine</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
-  body {
-    margin: 0;
-    background: linear-gradient(#87ceeb, #ffffff);
-    font-family: Arial, sans-serif;
-    text-align: center;
-  }
-
-  canvas {
-    background: #cceeff;
-    display: block;
-    margin: auto;
-    border: 2px solid #333;
-  }
-
-  #coins {
-    font-size: 22px;
-    margin: 10px;
-    font-weight: bold;
-  }
-
-  button {
-    padding: 10px 25px;
-    font-size: 18px;
-    margin: 10px;
-    cursor: pointer;
-  }
+body{
+ margin:0;
+ background:linear-gradient(#6ec6ff,#e0f7fa);
+ font-family:Arial;
+ text-align:center;
+}
+canvas{
+ background:linear-gradient(#9adfff,#ffffff);
+ border-radius:12px;
+ border:3px solid #222;
+ display:block;
+ margin:auto;
+}
+#hud{
+ font-size:16px;
+ font-weight:bold;
+ padding:6px;
+}
+button{
+ padding:8px 14px;
+ margin:3px;
+ font-size:15px;
+ border-radius:8px;
+}
 </style>
 </head>
 
 <body>
 
-<div id="coins">🪙 Coins: 0</div>
-<canvas id="game" width="360" height="500"></canvas>
-<button onclick="shoot()">🔫 Shoot</button>
+<div id="hud">🪙 0 | ⭐ 1 | 🔫 Lv1</div>
+<canvas id="game" width="360" height="480"></canvas>
 
-<!-- Sounds -->
-<audio id="shootSound" src="https://actions.google.com/sounds/v1/impacts/wood_plank_flicks.ogg"></audio>
-<audio id="boomSound" src="https://actions.google.com/sounds/v1/explosions/explosion.ogg"></audio>
+<div>
+<button onclick="shoot()">🔫 Shoot</button>
+<button onclick="shop()">🛒 Shop</button>
+<button onclick="missions()">🎯 Missions</button>
+<button onclick="leaderboard()">🏆 Rank</button>
+</div>
 
 <script>
-let tg = window.Telegram.WebApp;
-tg.expand();
+Telegram.WebApp.expand();
 
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const c=document.getElementById("game");
+const x=c.getContext("2d");
 
-const shootSound = document.getElementById("shootSound");
-const boomSound = document.getElementById("boomSound");
+let coins=Number(localStorage.coins||0);
+let level=Number(localStorage.level||1);
+let gun=Number(localStorage.gun||1);
+let kills=Number(localStorage.kills||0);
+let skin=localStorage.skin||"🧑‍🚀";
 
-let coins = 0;
+let bullets=[];
+let clouds=[{x:0,y:40},{x:150,y:70},{x:300,y:50}];
 
-// Player
-let shooter = { x: 170, y: 420 };
+let plane={x:-80,y:80,alive:true,boss:false};
 
-// Plane
-let plane = {
-  x: -80,
-  y: 80,
-  alive: true
-};
+let bots=[
+ {name:"Ali",coins:200},
+ {name:"Ahmed",coins:150},
+ {name:"John",coins:180},
+ {name:"Max",coins:220}
+];
 
-// Bullets
-let bullets = [];
-
-// Shoot
-function shoot() {
-  shootSound.currentTime = 0;
-  shootSound.play();
-  bullets.push({ x: shooter.x + 10, y: shooter.y });
+function save(){
+ localStorage.coins=coins;
+ localStorage.level=level;
+ localStorage.gun=gun;
+ localStorage.kills=kills;
+ localStorage.skin=skin;
 }
 
-// Game loop
-function update() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Ground
-  ctx.fillStyle = "#4CAF50";
-  ctx.fillRect(0, 450, 360, 50);
-
-  // Shooter
-  ctx.font = "30px Arial";
-  ctx.fillText("🧑‍🚀", shooter.x, shooter.y);
-
-  // Plane
-  if (plane.alive) {
-    plane.x += 2;
-    if (plane.x > 400) plane.x = -80;
-    ctx.font = "32px Arial";
-    ctx.fillText("✈️", plane.x, plane.y);
-  }
-
-  // Bullets
-  ctx.font = "20px Arial";
-  for (let i = bullets.length - 1; i >= 0; i--) {
-    bullets[i].y -= 6;
-    ctx.fillText("💥", bullets[i].x, bullets[i].y);
-
-    // Hit detection
-    if (
-      plane.alive &&
-      bullets[i].y < plane.y + 25 &&
-      bullets[i].x > plane.x &&
-      bullets[i].x < plane.x + 40
-    ) {
-      boomSound.currentTime = 0;
-      boomSound.play();
-
-      plane.alive = false;
-      coins += 10;
-      document.getElementById("coins").innerText = "🪙 Coins: " + coins;
-
-      setTimeout(() => {
-        plane.x = -80;
-        plane.alive = true;
-      }, 1200);
-
-      bullets.splice(i, 1);
-    }
-
-    if (bullets[i] && bullets[i].y < 0) {
-      bullets.splice(i, 1);
-    }
-  }
-
-  requestAnimationFrame(update);
+function hud(){
+ document.getElementById("hud").innerText=
+ `🪙 ${coins} | ⭐ ${level} | 🔫 Lv${gun}`;
 }
 
-update();
+function shoot(){
+ bullets.push({x:180,y:420});
+}
+
+function shop(){
+ if(coins>=100){
+  coins-=100; gun++;
+  alert("Gun upgraded!");
+  save(); hud();
+ }else alert("Need 100 coins");
+}
+
+function missions(){
+ alert(
+ "🎯 MISSIONS\n"+
+ "1️⃣ Shoot 5 planes = +50 coins\n"+
+ "2️⃣ Defeat boss = +100 coins\n"+
+ "3️⃣ Reach level 5"
+ );
+}
+
+function leaderboard(){
+ let all=[{name:"YOU",coins:coins},...bots];
+ all.sort((a,b)=>b.coins-a.coins);
+ let text="🏆 LEADERBOARD\n";
+ all.slice(0,5).forEach((p,i)=>{
+  text+=`${i+1}. ${p.name} - ${p.coins}\n`;
+ });
+ alert(text);
+}
+
+function spawnPlane(){
+ plane.alive=true;
+ plane.x=-80;
+ plane.y=60+Math.random()*100;
+ plane.boss = level%5===0;
+}
+
+spawnPlane(); hud();
+
+function loop(){
+ x.clearRect(0,0,360,480);
+
+ // clouds
+ x.font="28px Arial";
+ clouds.forEach(cl=>{
+  cl.x+=0.3;
+  if(cl.x>380) cl.x=-50;
+  x.fillText("☁️",cl.x,cl.y);
+ });
+
+ // ground
+ x.fillStyle="#4caf50";
+ x.fillRect(0,440,360,40);
+
+ // player
+ x.font="30px Arial";
+ x.fillText(skin,165,420);
+
+ // plane
+ if(plane.alive){
+  plane.x+=2+level/2;
+  x.font=plane.boss?"40px Arial":"30px Arial";
+  x.fillText(plane.boss?"🛩️":"✈️",plane.x,plane.y);
+  if(plane.x>380) spawnPlane();
+ }
+
+ // bullets
+ for(let i=bullets.length-1;i>=0;i--){
+  bullets[i].y-=6+gun;
+  x.font="20px Arial";
+  x.fillText("🔥",bullets[i].x,bullets[i].y);
+
+  if(plane.alive &&
+     bullets[i].y<plane.y+30 &&
+     bullets[i].x>plane.x &&
+     bullets[i].x<plane.x+40){
+
+    plane.alive=false;
+    kills++;
+    coins+=plane.boss?80:15;
+    if(kills%5===0) level++;
+    save(); hud();
+    setTimeout(spawnPlane,800);
+    bullets.splice(i,1);
+  }
+
+  if(bullets[i] && bullets[i].y<0) bullets.splice(i,1);
+ }
+
+ requestAnimationFrame(loop);
+}
+loop();
 </script>
 
 </body>
