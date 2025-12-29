@@ -7,11 +7,6 @@
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-<script src="//libtl.com/sdk.js"
- data-zone="10388714"
- data-sdk="show_10388714"
- data-auto="false"></script>
-
 <style>
 body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden}
 header{position:fixed;top:0;width:100%;height:50px;background:#111;
@@ -33,8 +28,6 @@ background:#222;padding:15px;border:2px solid #555;display:none}
  <span id="hud"></span>
  <button onclick="shoot()">🔥</button>
  <button onclick="openShop()">🛒</button>
- <button onclick="openMissions()">🏆</button>
- <button onclick="watchRewardAd('daily')">🎁</button>
 </header>
 
 <canvas id="game" width="360" height="600"></canvas>
@@ -45,16 +38,8 @@ background:#222;padding:15px;border:2px solid #555;display:none}
  <button onclick="watchRewardAd('speed')">⚡ Speed (1 Ad)</button>
  <h4>🎨 Skins (2 Ads)</h4>
  <div id="skins"></div>
+ <br>
  <button onclick="closeShop()">Close</button>
-</div>
-
-<!-- MISSIONS -->
-<div id="missions" class="menu">
- <h3>🏆 Daily Missions</h3>
- <p id="m1"></p>
- <p id="m2"></p>
- <p id="m3"></p>
- <button onclick="closeMissions()">Close</button>
 </div>
 
 <!-- GAME OVER -->
@@ -71,54 +56,68 @@ background:#222;padding:15px;border:2px solid #555;display:none}
  <a href="contact.html">Contact</a>
 </div>
 
-
-
-
-
-
-
-
-
- 
 <script>
- let userInteracted = false;
+Telegram.WebApp.expand();
+
+/* ================= ADS CORE (FINAL FIX) ================= */
+
+let monetagLoaded = false;
 let adInProgress = false;
 
-// unlock ads only after real user action
-function unlockAdsOnce() {
-  userInteracted = true;
-  document.removeEventListener("click", unlockAdsOnce);
-  document.removeEventListener("keydown", unlockAdsOnce);
-  document.removeEventListener("touchstart", unlockAdsOnce);
+function loadMonetag(callback){
+  if(monetagLoaded){
+    callback();
+    return;
+  }
+
+  const s = document.createElement("script");
+  s.src = "//libtl.com/sdk.js";
+  s.dataset.zone = "10388714";
+  s.dataset.sdk = "show_10388714";
+  s.dataset.auto = "false";
+  s.onload = () => {
+    monetagLoaded = true;
+    callback();
+  };
+  document.body.appendChild(s);
 }
 
-// listen for first interaction
-document.addEventListener("click", unlockAdsOnce);
-document.addEventListener("keydown", unlockAdsOnce);
-document.addEventListener("touchstart", unlockAdsOnce);
+function watchRewardAd(type, skinIndex=null){
+  if(adInProgress) return;
+  adInProgress = true;
 
+  loadMonetag(() => {
+    show_10388714('pop')
+      .then(() => giveReward(type, skinIndex))
+      .catch(() => {})
+      .finally(() => {
+        setTimeout(()=>adInProgress=false, 1500);
+      });
+  });
+}
 
-/* ---------- DATA ---------- */
+/* ================= GAME DATA ================= */
+
 const colors=["cyan","red","lime","yellow","orange","pink","purple","gold"];
-
 let save=JSON.parse(localStorage.getItem("mmSave"))||{
- coins:0,level:1,speed:6,skin:0,unlocked:[0],
- kills:0,games:0,ads:0,day:Date.now()
+ coins:0,level:1,speed:6,skin:0,unlocked:[0]
 };
 
-let {coins,level,speed,skin,unlocked,kills,games,ads,day}=save;
+let {coins,level,speed,skin,unlocked}=save;
 let bullets=[],enemies=[],game=true,skinAds=0;
 let player={x:165,y:530,w:30,h:30};
-const c=document.getElementById("game"),ctx=c.getContext("2d");
 
-/* ---------- HUD ---------- */
+const c=document.getElementById("game");
+const ctx=c.getContext("2d");
+
+/* ================= HUD ================= */
 function hud(){
- document.getElementById("hud").innerText=`💰${coins} | Lv ${level}`;
- localStorage.setItem("mmSave",JSON.stringify(save));
+ document.getElementById("hud").innerText=`💰 ${coins} | Lv ${level}`;
+ localStorage.setItem("mmSave",JSON.stringify({coins,level,speed,skin,unlocked}));
 }
 hud();
 
-/* ---------- GAME ---------- */
+/* ================= CONTROLS ================= */
 function shoot(){bullets.push({x:player.x+12,y:player.y})}
 document.onkeydown=e=>{
  if(e.key==="ArrowLeft")player.x-=speed;
@@ -126,6 +125,7 @@ document.onkeydown=e=>{
  if(e.key===" ")shoot();
 };
 
+/* ================= GAME LOOP ================= */
 function spawnEnemy(){
  enemies.push({x:Math.random()*330,y:-30,s:25,hp:2,sp:2+level*0.2});
 }
@@ -133,85 +133,85 @@ function spawnEnemy(){
 function loop(){
  if(!game)return;
  ctx.clearRect(0,0,360,600);
+
  ctx.fillStyle=colors[skin];
  ctx.fillRect(player.x,player.y,30,30);
 
  bullets.forEach((b,i)=>{
-  b.y-=10;ctx.fillStyle="yellow";
+  b.y-=10;
+  ctx.fillStyle="yellow";
   ctx.fillRect(b.x,b.y,5,10);
   if(b.y<0)bullets.splice(i,1);
  });
 
  enemies.forEach((e,i)=>{
-  e.y+=e.sp;ctx.fillStyle="orange";
+  e.y+=e.sp;
+  ctx.fillStyle="orange";
   ctx.fillRect(e.x,e.y,e.s,e.s);
+
   bullets.forEach((b,bi)=>{
    if(b.x<e.x+e.s&&b.x+5>e.x&&b.y<e.y+e.s){
-    bullets.splice(bi,1);e.hp--;
-    if(e.hp<=0){coins+=5;kills++;enemies.splice(i,1);}
+    bullets.splice(bi,1);
+    e.hp--;
+    if(e.hp<=0){
+     coins+=5;
+     enemies.splice(i,1);
+    }
    }
   });
-  if(player.x<e.x+e.s&&player.x+30>e.x&&player.y<e.y+e.s) endGame();
+
+  if(player.x<e.x+e.s&&player.x+30>e.x&&player.y<e.y+e.s){
+   endGame();
+  }
  });
 
  if(Math.random()<0.03)spawnEnemy();
  level=Math.max(level,Math.floor(coins/50)+1);
- hud();requestAnimationFrame(loop);
+ hud();
+ requestAnimationFrame(loop);
 }
 loop();
 
-/* ---------- MISSIONS ---------- */
-function openMissions(){
- missions.style.display="block";
- m1.innerText=`Kill 10 enemies: ${kills}/10`;
- m2.innerText=`Play 3 games: ${games}/3`;
- m3.innerText=`Watch 1 ad: ${ads}/1`;
-}
-function closeMissions(){missions.style.display="none";}
-
-/* ---------- GAME OVER ---------- */
+/* ================= GAME OVER ================= */
 function endGame(){
- game=false;games++;
+ game=false;
  finalScore.innerText=`Coins: ${coins}`;
  gameover.style.display="block";
- Telegram.WebApp.sendData(JSON.stringify({coins,level}));
 }
+
 function restart(){location.reload();}
 
-/* ---------- SHOP ---------- */
+/* ================= SHOP ================= */
 function openShop(){shop.style.display="block";renderSkins();}
 function closeShop(){shop.style.display="none";}
 
-/* ---------- MONETAG ---------- */
-function watchRewardAd(type, skinIndex = null) {
-
-  // ❌ BLOCK ads on app start
-  if (!userInteracted) {
-    alert("Please interact with the game first 🙂");
-    return;
+/* ================= REWARDS ================= */
+function giveReward(type, skinIndex){
+ if(type==="speed"){
+  speed+=2;
+  alert("⚡ Speed Boosted");
+ }
+ if(type==="revive"){
+  game=true;
+  gameover.style.display="none";
+  requestAnimationFrame(loop);
+ }
+ if(type==="skin"){
+  skinAds++;
+  if(skinAds>=2){
+   unlocked.push(skinIndex);
+   skin=skinIndex;
+   skinAds=0;
+   alert("🎨 Skin Unlocked");
+  }else{
+   alert("Watch 1 more ad");
   }
-
-  // ❌ prevent double / resume calls
-  if (adInProgress) return;
-
-  adInProgress = true;
-
-  show_10388714('pop')
-    .then(() => {
-      giveReward(type, skinIndex);
-    })
-    .catch(err => {
-      console.log("Ad error:", err);
-    })
-    .finally(() => {
-      setTimeout(() => {
-        adInProgress = false;
-      }, 1500);
-    });
+ }
+ hud();
+ renderSkins();
 }
 
-
-/* ---------- SKINS ---------- */
+/* ================= SKINS ================= */
 function renderSkins(){
  skins.innerHTML="";
  colors.forEach((c,i)=>{
