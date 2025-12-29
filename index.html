@@ -4,15 +4,15 @@
 <meta charset="UTF-8">
 <title>Money Machine</title>
 <style>
-body{margin:0;background:#000;color:#fff;font-family:sans-serif;overflow:hidden}
+body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden}
 #ui{position:fixed;top:5px;left:5px;z-index:10}
-button{padding:8px;margin:2px;font-size:14px}
-#game{background:#111;display:block;margin:0 auto}
-#shop,#settings,#reward,#gameover{
+button{padding:6px;margin:2px;font-size:13px}
+canvas{background:#111;display:block;margin:auto}
+.menu{
  position:fixed;top:50%;left:50%;
  transform:translate(-50%,-50%);
- background:#222;padding:15px;display:none;
- border:2px solid #555
+ background:#222;padding:15px;
+ border:2px solid #555;display:none
 }
 </style>
 </head>
@@ -20,18 +20,18 @@ button{padding:8px;margin:2px;font-size:14px}
 <body>
 
 <div id="ui">
- <span id="hud"></span><br>
+ <div id="hud"></div>
  <button onclick="shoot()">🔥 Shoot</button>
  <button onclick="openShop()">🛒 Shop</button>
  <button onclick="openSettings()">⚙️</button>
  <button onclick="dailyReward()">🎁</button><br>
- <button onclick="moveLeft()">⬅</button>
- <button onclick="moveRight()">➡</button>
+ <button onclick="move(-1)">⬅</button>
+ <button onclick="move(1)">➡</button>
 </div>
 
 <canvas id="game" width="360" height="600"></canvas>
 
-<div id="shop">
+<div id="shop" class="menu">
  <h3>🛒 Shop</h3>
  <button onclick="watchAd('speed')">⚡ Speed (1 Ad)</button><br>
  <button onclick="watchAd('life')">❤️ Extra Life (2 Ads)</button>
@@ -39,15 +39,15 @@ button{padding:8px;margin:2px;font-size:14px}
  <button onclick="closeShop()">Close</button>
 </div>
 
-<div id="settings">
+<div id="settings" class="menu">
  <h3>⚙️ Settings</h3>
- Sensitivity
+ Sensitivity<br>
  <input type="range" min="1" max="10" value="5"
-  onchange="sensitivity=this.value">
- <br><button onclick="closeSettings()">Close</button>
+ oninput="sensitivity=this.value"><br><br>
+ <button onclick="closeSettings()">Close</button>
 </div>
 
-<div id="gameover">
+<div id="gameover" class="menu">
  <h2>💀 GAME OVER</h2>
  <button onclick="restart()">🔄 Restart</button>
 </div>
@@ -58,15 +58,14 @@ const ctx=c.getContext("2d");
 
 let player={x:160,y:520,w:30,h:30};
 let bullets=[],enemies=[];
-let coins=0,lives=1,level=1;
+let coins=0,lives=3,level=1;
 let speed=6,sensitivity=5;
 let game=true,boss=false;
-
 let ads={speed:0,life:0};
 
 function hud(){
  document.getElementById("hud").innerText=
- `💰${coins} ❤️${lives} 🔥Lv${level}`;
+ `💰${coins} ❤️${lives} 🔥 Level ${level}`;
 }
 hud();
 
@@ -74,12 +73,14 @@ function shoot(){
  bullets.push({x:player.x+12,y:player.y});
 }
 
-function moveLeft(){player.x-=speed*sensitivity/5}
-function moveRight(){player.x+=speed*sensitivity/5}
+function move(dir){
+ player.x+=dir*speed*(sensitivity/5);
+ player.x=Math.max(0,Math.min(330,player.x));
+}
 
 document.onkeydown=e=>{
- if(e.key=="ArrowLeft"||e.key=="a")moveLeft();
- if(e.key=="ArrowRight"||e.key=="d")moveRight();
+ if(e.key=="ArrowLeft"||e.key=="a")move(-1);
+ if(e.key=="ArrowRight"||e.key=="d")move(1);
  if(e.key==" ")shoot();
 };
 
@@ -87,9 +88,17 @@ function spawnEnemy(){
  let type=Math.random();
  enemies.push({
   x:Math.random()*330,
-  y:-20,
-  hp:type>0.9?10:1,
-  speed:type>0.9?1.5:2+level*0.1
+  y:-30,
+  size:type>0.85?40:25,
+  hp:type>0.85?8:2,
+  speed:type>0.85?1.5:2+level*0.1,
+  boss:false
+ });
+}
+
+function spawnBoss(){
+ enemies.push({
+  x:100,y:-80,size:80,hp:60,speed:1,boss:true
  });
 }
 
@@ -97,27 +106,31 @@ function update(){
  if(!game)return;
  ctx.clearRect(0,0,360,600);
 
+ // Player
  ctx.fillStyle="cyan";
  ctx.fillRect(player.x,player.y,player.w,player.h);
 
+ // Bullets
  bullets.forEach((b,i)=>{
-  b.y-=10;
+  b.y-=12;
   ctx.fillStyle="yellow";
   ctx.fillRect(b.x,b.y,5,10);
   if(b.y<0)bullets.splice(i,1);
  });
 
+ // Enemies
  enemies.forEach((e,ei)=>{
   e.y+=e.speed;
-  ctx.fillStyle=e.hp>5?"red":"orange";
-  ctx.fillRect(e.x,e.y,25,25);
+  ctx.fillStyle=e.boss?"purple":(e.hp>3?"red":"orange");
+  ctx.fillRect(e.x,e.y,e.size,e.size);
 
   bullets.forEach((b,bi)=>{
-   if(b.x<e.x+25&&b.x+5>e.x&&b.y<e.y+25&&b.y+10>e.y){
+   if(b.x<e.x+e.size&&b.x+5>e.x&&b.y<e.y+e.size&&b.y+10>e.y){
     e.hp--; bullets.splice(bi,1);
     if(e.hp<=0){
-     coins+=5;
+     coins+=e.boss?100:5;
      enemies.splice(ei,1);
+     if(e.boss){boss=false;level++;}
     }
    }
   });
@@ -129,8 +142,13 @@ function update(){
   }
  });
 
- if(Math.random()<0.02+level*0.002)spawnEnemy();
- if(coins>level*50){level++; if(level==10)boss=true;}
+ if(!boss && Math.random()<0.02+level*0.002)spawnEnemy();
+ if(level==10 && !boss){
+  boss=true;
+  spawnBoss();
+ }
+
+ if(coins>level*50 && !boss)level++;
 
  hud();
  requestAnimationFrame(update);
@@ -142,19 +160,17 @@ function endGame(){
  document.getElementById("gameover").style.display="block";
 }
 
-function restart(){
- location.reload();
-}
+function restart(){location.reload();}
 
-function openShop(){document.getElementById("shop").style.display="block";}
-function closeShop(){document.getElementById("shop").style.display="none";}
+function openShop(){shop.style.display="block";}
+function closeShop(){shop.style.display="none";}
 
-function openSettings(){document.getElementById("settings").style.display="block";}
-function closeSettings(){document.getElementById("settings").style.display="none";}
+function openSettings(){settings.style.display="block";}
+function closeSettings(){settings.style.display="none";}
 
 function dailyReward(){
  coins+=20;
- alert("🎁 Daily reward: +20 coins");
+ alert("🎁 Daily Reward +20 Coins");
  hud();
 }
 
