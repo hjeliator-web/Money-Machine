@@ -14,6 +14,7 @@ canvas{background:#111;display:block;margin:auto}
  background:#222;padding:15px;
  border:2px solid #555;display:none
 }
+select,input{width:100%}
 </style>
 </head>
 
@@ -41,40 +42,67 @@ canvas{background:#111;display:block;margin:auto}
 
 <div id="settings" class="menu">
  <h3>⚙️ Settings</h3>
- Sensitivity<br>
+ Sensitivity
  <input type="range" min="1" max="10" value="5"
  oninput="sensitivity=this.value"><br><br>
+
+ Player Skin
+ <select onchange="setSkin(this.value)">
+  <option value="cyan">Cyan</option>
+  <option value="red">Red</option>
+  <option value="lime">Green</option>
+ </select><br><br>
+
  <button onclick="closeSettings()">Close</button>
 </div>
 
 <div id="gameover" class="menu">
  <h2>💀 GAME OVER</h2>
+ <div id="leaderboard"></div><br>
  <button onclick="restart()">🔄 Restart</button>
 </div>
+
+<!-- Sounds -->
+<audio id="sndShoot" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+<audio id="sndHit" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+<audio id="sndOver" src="https://actions.google.com/sounds/v1/cartoon/boing.ogg"></audio>
 
 <script>
 const c=document.getElementById("game");
 const ctx=c.getContext("2d");
 
+let data=JSON.parse(localStorage.getItem("moneyMachine"))||{
+ coins:0,lives:3,level:1,speed:6,skin:"cyan"
+};
+
 let player={x:160,y:520,w:30,h:30};
 let bullets=[],enemies=[];
-let coins=0,lives=3,level=1;
-let speed=6,sensitivity=5;
+let coins=data.coins,lives=data.lives,level=data.level;
+let speed=data.speed,sensitivity=5;
+let skin=data.skin;
 let game=true,boss=false;
 let ads={speed:0,life:0};
+
+function save(){
+ localStorage.setItem("moneyMachine",JSON.stringify({
+  coins,lives,level,speed,skin
+ }));
+}
 
 function hud(){
  document.getElementById("hud").innerText=
  `💰${coins} ❤️${lives} 🔥 Level ${level}`;
+ save();
 }
 hud();
 
 function shoot(){
  bullets.push({x:player.x+12,y:player.y});
+ sndShoot.play();
 }
 
-function move(dir){
- player.x+=dir*speed*(sensitivity/5);
+function move(d){
+ player.x+=d*speed*(sensitivity/5);
  player.x=Math.max(0,Math.min(330,player.x));
 }
 
@@ -85,32 +113,26 @@ document.onkeydown=e=>{
 };
 
 function spawnEnemy(){
- let type=Math.random();
+ let t=Math.random();
  enemies.push({
-  x:Math.random()*330,
-  y:-30,
-  size:type>0.85?40:25,
-  hp:type>0.85?8:2,
-  speed:type>0.85?1.5:2+level*0.1,
-  boss:false
+  x:Math.random()*330,y:-30,
+  size:t>0.85?40:25,
+  hp:t>0.85?6:2,
+  speed:2+level*0.15,boss:false
  });
 }
 
 function spawnBoss(){
- enemies.push({
-  x:100,y:-80,size:80,hp:60,speed:1,boss:true
- });
+ enemies.push({x:80,y:-100,size:100,hp:80,speed:1,boss:true});
 }
 
 function update(){
  if(!game)return;
  ctx.clearRect(0,0,360,600);
 
- // Player
- ctx.fillStyle="cyan";
+ ctx.fillStyle=skin;
  ctx.fillRect(player.x,player.y,player.w,player.h);
 
- // Bullets
  bullets.forEach((b,i)=>{
   b.y-=12;
   ctx.fillStyle="yellow";
@@ -118,17 +140,17 @@ function update(){
   if(b.y<0)bullets.splice(i,1);
  });
 
- // Enemies
  enemies.forEach((e,ei)=>{
   e.y+=e.speed;
-  ctx.fillStyle=e.boss?"purple":(e.hp>3?"red":"orange");
+  ctx.fillStyle=e.boss?"purple":"orange";
   ctx.fillRect(e.x,e.y,e.size,e.size);
 
   bullets.forEach((b,bi)=>{
    if(b.x<e.x+e.size&&b.x+5>e.x&&b.y<e.y+e.size&&b.y+10>e.y){
     e.hp--; bullets.splice(bi,1);
+    sndHit.play();
     if(e.hp<=0){
-     coins+=e.boss?100:5;
+     coins+=e.boss?150:5;
      enemies.splice(ei,1);
      if(e.boss){boss=false;level++;}
     }
@@ -142,13 +164,9 @@ function update(){
   }
  });
 
- if(!boss && Math.random()<0.02+level*0.002)spawnEnemy();
- if(level==10 && !boss){
-  boss=true;
-  spawnBoss();
- }
-
- if(coins>level*50 && !boss)level++;
+ if(!boss && Math.random()<0.02)spawnEnemy();
+ if(level==10 && !boss){boss=true;spawnBoss();}
+ if(coins>level*60 && !boss)level++;
 
  hud();
  requestAnimationFrame(update);
@@ -157,38 +175,49 @@ update();
 
 function endGame(){
  game=false;
- document.getElementById("gameover").style.display="block";
+ sndOver.play();
+ saveScore();
+ showLeaderboard();
+ gameover.style.display="block";
 }
 
 function restart(){location.reload();}
 
+function saveScore(){
+ let lb=JSON.parse(localStorage.getItem("leaderboard"))||[];
+ lb.push({score:coins,date:new Date().toLocaleDateString()});
+ lb.sort((a,b)=>b.score-a.score);
+ lb=lb.slice(0,5);
+ localStorage.setItem("leaderboard",JSON.stringify(lb));
+}
+
+function showLeaderboard(){
+ let lb=JSON.parse(localStorage.getItem("leaderboard"))||[];
+ leaderboard.innerHTML="<h3>🏆 Leaderboard</h3>"+
+ lb.map(e=>`💰 ${e.score} (${e.date})`).join("<br>");
+}
+
 function openShop(){shop.style.display="block";}
 function closeShop(){shop.style.display="none";}
-
 function openSettings(){settings.style.display="block";}
 function closeSettings(){settings.style.display="none";}
 
-function dailyReward(){
- coins+=20;
- alert("🎁 Daily Reward +20 Coins");
- hud();
-}
+function setSkin(s){skin=s;save();}
+
+function dailyReward(){coins+=20;alert("🎁 +20 Coins");hud();}
 
 function watchAd(type){
  let need=type=="speed"?1:2;
- let s=document.getElementById("adStatus");
- s.innerText="Watching ad...";
+ adStatus.innerText="Watching ad...";
  setTimeout(()=>{
   ads[type]++;
   if(ads[type]>=need){
    ads[type]=0;
    if(type=="speed")speed+=2;
    if(type=="life")lives++;
-   s.innerText="✅ Reward unlocked";
+   adStatus.innerText="✅ Reward unlocked";
    hud();
-  }else{
-   s.innerText=`Watch ${need-ads[type]} more ad(s)`;
-  }
+  }else adStatus.innerText=`Watch ${need-ads[type]} more ads`;
  },5000);
 }
 </script>
