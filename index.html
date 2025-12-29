@@ -8,7 +8,7 @@
 <style>
   body {
     margin: 0;
-    background: linear-gradient(#87ceeb, #fff);
+    background: linear-gradient(#87ceeb, #ffffff);
     font-family: Arial, sans-serif;
     text-align: center;
   }
@@ -20,14 +20,14 @@
     border: 2px solid #333;
   }
 
-  #money {
+  #coins {
     font-size: 22px;
     margin: 10px;
     font-weight: bold;
   }
 
   button {
-    padding: 10px 20px;
+    padding: 10px 25px;
     font-size: 18px;
     margin: 10px;
     cursor: pointer;
@@ -37,9 +37,9 @@
 
 <body>
 
-<div id="money">💰 Money: $0</div>
+<div id="coins">🪙 Coins: 0</div>
 <canvas id="game" width="360" height="500"></canvas>
-<button onclick="dig()">⛏ Dig</button>
+<button onclick="shoot()">🔫 Shoot</button>
 
 <script>
 let tg = window.Telegram.WebApp;
@@ -48,44 +48,75 @@ tg.expand();
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-let money = 0;
+let coins = 0;
 
-// Cartoon objects
-let player = { x: 160, y: 380, w: 40, h: 40 };
-let plane = { x: -100, y: 60 };
-let coins = [];
+// Player
+let shooter = { x: 170, y: 420 };
 
-function dig() {
-  money += 5;
-  document.getElementById("money").innerText = "💰 Money: $" + money;
-  coins.push({ x: player.x + 15, y: player.y });
+// Plane
+let plane = {
+  x: -80,
+  y: 80,
+  alive: true
+};
+
+// Bullets
+let bullets = [];
+
+// Shoot function
+function shoot() {
+  bullets.push({ x: shooter.x + 10, y: shooter.y });
 }
 
 // Game loop
 function update() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Ground
-  ctx.fillStyle = "#8B4513";
-  ctx.fillRect(0,420,360,80);
+  ctx.fillStyle = "#4CAF50";
+  ctx.fillRect(0, 450, 360, 50);
 
-  // Player (cartoon digger)
-  ctx.fillStyle = "orange";
-  ctx.fillRect(player.x, player.y, player.w, player.h);
-  ctx.fillStyle = "black";
-  ctx.fillText("⛏", player.x + 10, player.y + 25);
-
-  // Plane
-  plane.x += 2;
-  if (plane.x > 400) plane.x = -100;
+  // Shooter
   ctx.font = "30px Arial";
-  ctx.fillText("✈️", plane.x, plane.y);
+  ctx.fillText("🧑‍🚀", shooter.x, shooter.y);
 
-  // Coins
+  // Plane movement
+  if (plane.alive) {
+    plane.x += 2;
+    if (plane.x > 400) plane.x = -80;
+    ctx.font = "32px Arial";
+    ctx.fillText("✈️", plane.x, plane.y);
+  }
+
+  // Bullets
   ctx.font = "20px Arial";
-  for (let i = 0; i < coins.length; i++) {
-    coins[i].y -= 2;
-    ctx.fillText("🪙", coins[i].x, coins[i].y);
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    bullets[i].y -= 5;
+    ctx.fillText("💥", bullets[i].x, bullets[i].y);
+
+    // Collision
+    if (
+      plane.alive &&
+      bullets[i].y < plane.y + 20 &&
+      bullets[i].x > plane.x &&
+      bullets[i].x < plane.x + 40
+    ) {
+      plane.alive = false;
+      coins += 10;
+      document.getElementById("coins").innerText = "🪙 Coins: " + coins;
+
+      // Respawn plane
+      setTimeout(() => {
+        plane.x = -80;
+        plane.alive = true;
+      }, 1000);
+
+      bullets.splice(i, 1);
+    }
+
+    if (bullets[i] && bullets[i].y < 0) {
+      bullets.splice(i, 1);
+    }
   }
 
   requestAnimationFrame(update);
@@ -96,4 +127,3 @@ update();
 
 </body>
 </html>
-
